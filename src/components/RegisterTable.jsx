@@ -35,7 +35,7 @@ export default function RegisterTable({
           <div className="card-title">📑 वार्ड 01 अध्यक्ष - संपूर्ण संपत्ति एवं गृहकर रजिस्टर</div>
           <div className="card-desc">MongoDB डेटाबेस • सर्च, फिल्टर, संपादन और 1-क्लिक प्रिंट पर्ची की सुविधा</div>
         </div>
-        <div className="filters-group">
+        <div className="card-header-actions">
           <button className="btn btn-success btn-sm" onClick={onExportCSV}>
             <Download size={14} /> एक्सेल / CSV एक्सपोर्ट
           </button>

@@ -50,16 +50,18 @@ export default function Header({
         <div className="brand-section">
           <div className="brand-logo-badge">🏛️</div>
           <div className="brand-titles">
-            <h1>
-              डिजिटल गृहकर प्रबंधन प्रणाली
-              <span className="badge-ward">{wardName}</span>
-              <span className={`db-status-badge ${dbConnected ? 'connected' : 'disconnected'}`}>
-                <span className="db-dot" />
-                <Database size={13} style={{ marginLeft: 2 }} />
-                {dbConnected ? 'MongoDB Atlas Live' : 'Connecting DB...'}
-              </span>
-            </h1>
-            <p>
+            <div className="brand-titles-main">
+              <h1 className="brand-heading">डिजिटल गृहकर प्रबंधन प्रणाली</h1>
+              <div className="brand-badges-row">
+                <span className="badge-ward">{wardName}</span>
+                <span className={`db-status-badge ${dbConnected ? 'connected' : 'disconnected'}`}>
+                  <span className="db-dot" />
+                  <Database size={13} style={{ marginLeft: 2 }} />
+                  <span className="db-badge-text">{dbConnected ? 'MongoDB Atlas Live' : 'Connecting DB...'}</span>
+                </span>
+              </div>
+            </div>
+            <p className="brand-subtext">
               नगर निकाय गृहकर (House Tax) एवं वार्षिक किराया मूल्य (ARV) निर्धारण पोर्टल • MERN Stack (React + Node.js + MongoDB)
             </p>
           </div>
@@ -68,22 +70,22 @@ export default function Header({
         <div className="header-actions">
           {/* Theme Toggle */}
           <button 
-            className="btn btn-outline btn-sm" 
+            className="btn btn-outline btn-sm header-action-btn" 
             onClick={onToggleTheme} 
             title="थीम बदलें (Dark/Light)"
           >
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-            <span>{theme === 'dark' ? 'लाइट मोड' : 'डार्क मोड'}</span>
+            <span className="btn-label">{theme === 'dark' ? 'लाइट मोड' : 'डार्क मोड'}</span>
           </button>
           
           {/* New Entry Button */}
           {currentUser?.role !== 'viewer' && (
             <button 
-              className="btn btn-primary btn-sm" 
+              className="btn btn-primary btn-sm header-action-btn" 
               onClick={onNewEntry}
             >
               <PlusCircle size={15} />
-              <span>नई प्रविष्टि</span>
+              <span className="btn-label">नई प्रविष्टि</span>
             </button>
           )}
 

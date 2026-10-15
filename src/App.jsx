@@ -383,7 +383,7 @@ export default function App() {
   // If NOT logged in, show the official Login Screen
   if (!currentUser) {
     return (
-      <div>
+      <div className="app-root-wrapper">
         <LoginPage
           onLogin={handleLogin}
         />
@@ -401,7 +401,7 @@ export default function App() {
   }
 
   return (
-    <div>
+    <div className="app-root-wrapper">
       <Header
         wardName={settings?.ward_name || 'वार्ड 01 - अध्यक्ष'}
         dbConnected={dbConnected}
