@@ -37,38 +37,50 @@ export default function Dashboard({ stats, onOpenSlip, onViewAll }) {
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-info">
-            <div className="stat-label">कुल संपत्तियां (Total Properties)</div>
+            <div className="stat-label">
+              <span className="label-full">कुल संपत्तियां (Total Properties)</span>
+              <span className="label-short">कुल संपत्तियां</span>
+            </div>
             <div className="stat-value">{totalCount.toLocaleString('en-IN')}</div>
-            <div className="stat-sub">वार्ड 01 अंतर्गत कुल सर्वे भवनों की संख्या</div>
+            <div className="stat-sub">वार्ड 01 कुल सर्वे भवन</div>
           </div>
-          <div className="stat-icon"><Home size={22} /></div>
+          <div className="stat-icon"><Home size={20} /></div>
         </div>
 
         <div className="stat-card green">
           <div className="stat-info">
-            <div className="stat-label">कुल वार्षिक गृहकर मांग (Total Tax)</div>
+            <div className="stat-label">
+              <span className="label-full">कुल वार्षिक गृहकर मांग (Total Tax)</span>
+              <span className="label-short">कुल गृहकर मांग</span>
+            </div>
             <div className="stat-value">₹{totalTax.toLocaleString('en-IN')}</div>
-            <div className="stat-sub">10% वार्षिक शुद्ध गृहकर मांग</div>
+            <div className="stat-sub">10% वार्षिक शुद्ध मांग</div>
           </div>
-          <div className="stat-icon"><IndianRupee size={22} /></div>
+          <div className="stat-icon"><IndianRupee size={20} /></div>
         </div>
 
         <div className="stat-card amber">
           <div className="stat-info">
-            <div className="stat-label">कुल वार्षिक मूल्यांकन (Gross ARV)</div>
+            <div className="stat-label">
+              <span className="label-full">कुल वार्षिक मूल्यांकन (Gross ARV)</span>
+              <span className="label-short">वार्षिक ARV</span>
+            </div>
             <div className="stat-value">₹{totalARV.toLocaleString('en-IN')}</div>
-            <div className="stat-sub">छूट से पूर्व कुल वार्षिक किराया मूल्य</div>
+            <div className="stat-sub">छूट से पूर्व किराया मूल्य</div>
           </div>
-          <div className="stat-icon"><TrendingUp size={22} /></div>
+          <div className="stat-icon"><TrendingUp size={20} /></div>
         </div>
 
         <div className="stat-card purple">
           <div className="stat-info">
-            <div className="stat-label">व्यावसायिक एवं मिश्रित (Com/Mixed)</div>
+            <div className="stat-label">
+              <span className="label-full">व्यावसायिक एवं मिश्रित (Com/Mixed)</span>
+              <span className="label-short">व्यावसायिक / मिश्रित</span>
+            </div>
             <div className="stat-value">{(comCount + mixedCount).toLocaleString('en-IN')}</div>
-            <div className="stat-sub">व्यावसायिक कर मांग: ₹{(comTax + mixedTax).toLocaleString('en-IN')}</div>
+            <div className="stat-sub">मांग: ₹{(comTax + mixedTax).toLocaleString('en-IN')}</div>
           </div>
-          <div className="stat-icon"><Building2 size={22} /></div>
+          <div className="stat-icon"><Building2 size={20} /></div>
         </div>
       </div>
 

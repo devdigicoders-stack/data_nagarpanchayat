@@ -51,13 +51,15 @@ export default function Header({
           <div className="brand-logo-badge">🏛️</div>
           <div className="brand-titles">
             <div className="brand-titles-main">
-              <h1 className="brand-heading">डिजिटल गृहकर प्रबंधन प्रणाली</h1>
+              <h1 className="brand-heading">
+                डिजिटल गृहकर<span className="brand-heading-suffix"> प्रबंधन प्रणाली</span>
+              </h1>
               <div className="brand-badges-row">
                 <span className="badge-ward">{wardName}</span>
                 <span className={`db-status-badge ${dbConnected ? 'connected' : 'disconnected'}`}>
                   <span className="db-dot" />
-                  <Database size={13} style={{ marginLeft: 2 }} />
-                  <span className="db-badge-text">{dbConnected ? 'MongoDB Atlas Live' : 'Connecting DB...'}</span>
+                  <Database size={11} className="db-icon" />
+                  <span className="db-badge-text">{dbConnected ? 'Live' : 'Connecting...'}</span>
                 </span>
               </div>
             </div>
@@ -70,22 +72,24 @@ export default function Header({
         <div className="header-actions">
           {/* Theme Toggle */}
           <button 
-            className="btn btn-outline btn-sm header-action-btn" 
+            className="btn btn-outline btn-sm header-action-btn theme-toggle-btn" 
             onClick={onToggleTheme} 
-            title="थीम बदलें (Dark/Light)"
+            title={theme === 'dark' ? 'लाइट मोड चालू करें' : 'डार्क मोड चालू करें'}
           >
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-            <span className="btn-label">{theme === 'dark' ? 'लाइट मोड' : 'डार्क मोड'}</span>
+            <span className="btn-label-desktop">{theme === 'dark' ? 'लाइट मोड' : 'डार्क मोड'}</span>
           </button>
           
           {/* New Entry Button */}
           {currentUser?.role !== 'viewer' && (
             <button 
-              className="btn btn-primary btn-sm header-action-btn" 
+              className="btn btn-primary btn-sm header-action-btn new-entry-btn" 
               onClick={onNewEntry}
+              title="नया कर निर्धारण रिकॉर्ड दर्ज करें"
             >
               <PlusCircle size={15} />
-              <span className="btn-label">नई प्रविष्टि</span>
+              <span className="btn-label-desktop">नई प्रविष्टि</span>
+              <span className="btn-label-mobile">प्रविष्टि</span>
             </button>
           )}
 
