@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Download, Printer, Edit, Trash2 } from 'lucide-react';
+import { Search, Download, Printer, Edit, Trash2, FileText } from 'lucide-react';
 
 export default function RegisterTable({
   properties = [],
@@ -23,6 +23,7 @@ export default function RegisterTable({
   onDelete,
   onOwnerClick,
   onExportCSV,
+  onExportPDF,
   currentUser = null,
   currentWardName = 'सभी वार्ड',
   wards = [],
@@ -82,11 +83,22 @@ export default function RegisterTable({
 
           <button 
             className="btn btn-success btn-sm" 
-            onClick={() => onExportCSV(exportWard)}
+            onClick={() => onExportCSV(selectedWard)}
             title="चयनित वार्ड/फ़िल्टर का एक्सेल/CSV डेटा डाउनलोड करें"
           >
             <Download size={14} /> एक्सेल / CSV एक्सपोर्ट
           </button>
+
+          {onExportPDF && (
+            <button 
+              className="btn btn-primary btn-sm" 
+              onClick={() => onExportPDF(selectedWard)}
+              title="चयनित वार्ड/फ़िल्टर का संपूर्ण डेटा पीडीएफ (PDF) में निकालें या प्रिंट करें"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
+            >
+              <FileText size={14} /> 📄 पीडीएफ (PDF) / प्रिंट
+            </button>
+          )}
         </div>
       </div>
 
@@ -201,6 +213,8 @@ export default function RegisterTable({
               <th>आवासीय कर</th>
               <th>कमर्शियल कर</th>
               <th>प्लॉट कर</th>
+              <th className="sortable" onClick={() => onSortChange('water_tax')} style={{ color: '#1d4ed8' }}>जल कर (7.5%) ⬍</th>
+              <th className="sortable" onClick={() => onSortChange('sewer_tax')} style={{ color: '#15803d' }}>सीवर कर (2.5%) ⬍</th>
               <th className="sortable" onClick={() => onSortChange('total_tax')}>कुल गृहकर (₹) ⬍</th>
               <th style={{ textAlign: 'center' }}>कार्यवाही</th>
             </tr>
@@ -208,7 +222,7 @@ export default function RegisterTable({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="21" style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary)' }}>
+                <td colSpan="23" style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary)' }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: '0.95rem', fontWeight: 600 }}>
                     <span style={{ display: 'inline-block', width: 18, height: 18, border: '2.5px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                     डेटा फ़िल्टर हो रहा है...
@@ -217,7 +231,7 @@ export default function RegisterTable({
               </tr>
             ) : properties.length === 0 ? (
               <tr>
-                <td colSpan="21" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                <td colSpan="23" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                   <div style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: 6 }}>कोई रिकॉर्ड नहीं मिला</div>
                   <div style={{ fontSize: '0.85rem' }}>चयनित फ़िल्टर के अनुसार कोई संपत्ति डेटा उपलब्ध नहीं है।</div>
                   {hasActiveFilters && (
@@ -283,11 +297,29 @@ export default function RegisterTable({
                     <td>₹{p.com_tax || 0}</td>
                     <td>₹{p.plot_tax || 0}</td>
                     <td>
+                      {Number(p.water_tax) > 0 ? (
+                        <span style={{ color: '#1d4ed8', fontWeight: 600 }}>
+                          ₹{Number(p.water_tax).toLocaleString('en-IN')}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>₹0</span>
+                      )}
+                    </td>
+                    <td>
+                      {Number(p.sewer_tax) > 0 ? (
+                        <span style={{ color: '#15803d', fontWeight: 600 }}>
+                          ₹{Number(p.sewer_tax).toLocaleString('en-IN')}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>₹0</span>
+                      )}
+                    </td>
+                    <td>
                       <strong style={{ color: 'var(--success)' }}>₹{(p.total_tax || 0).toLocaleString('en-IN')}</strong>
                       {(p.has_water_tax || p.has_sewer_tax) && (
-                        <div style={{ fontSize: '0.68rem', color: '#1d4ed8', fontWeight: 600 }}>
-                          {p.has_water_tax && '🚰 जल '}
-                          {p.has_sewer_tax && '🚽 सीवर'}
+                        <div style={{ fontSize: '0.68rem', marginTop: 2, display: 'flex', gap: 4 }}>
+                          {p.has_water_tax && <span style={{ color: '#1d4ed8', fontWeight: 600 }}>🚰 जल</span>}
+                          {p.has_sewer_tax && <span style={{ color: '#15803d', fontWeight: 600 }}>🚽 सीवर</span>}
                         </div>
                       )}
                     </td>

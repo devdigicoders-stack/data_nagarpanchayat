@@ -432,6 +432,287 @@ export default function App() {
     }
   };
 
+  // PDF / Print full register data
+  const handleExportPDF = async (targetWardNo = selectedWard) => {
+    try {
+      showToast('संपूर्ण रजिस्टर पीडीएफ तैयार हो रहा है...', 'info');
+      const wardToExport = (targetWardNo !== undefined && targetWardNo !== null) ? targetWardNo : selectedWard;
+      const exportParams = new URLSearchParams({
+        limit: 'all',
+        ...(wardToExport && wardToExport !== 'all' ? { ward_no: wardToExport } : {}),
+        ...(houseType ? { house_type: houseType } : {}),
+        ...(nirman ? { nirman } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {})
+      });
+      const res = await fetch(`/api/properties?${exportParams.toString()}`);
+      const data = await res.json();
+      const allItems = data.items || [];
+
+      if (allItems.length === 0) {
+        showToast('पीडीएफ के लिए कोई रिकॉर्ड उपलब्ध नहीं है।', 'error');
+        return;
+      }
+
+      // Determine Ward Display Name
+      const targetWardObj = wards.find(w => String(w.ward_no) === String(wardToExport));
+      const wardLabel = (wardToExport === 'all' || !wardToExport) 
+        ? 'सभी वार्ड (संपूर्ण नगर निकाय)' 
+        : (targetWardObj?.ward_name || `वार्ड ${String(wardToExport).padStart(2, '0')}`);
+
+      const palikaName = settings?.palikaName || 'कार्यालय नगर पालिका परिषद / नगर पंचायत';
+      const currentDate = new Date().toLocaleDateString('hi-IN', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+      });
+
+      // Calculate totals
+      let sumARV = 0;
+      let sumResTax = 0;
+      let sumComTax = 0;
+      let sumPlotTax = 0;
+      let sumWaterTax = 0;
+      let sumSewerTax = 0;
+      let sumTotalTax = 0;
+
+      allItems.forEach(p => {
+        sumARV += Number(p.total_arv) || 0;
+        sumResTax += Number(p.res_tax) || 0;
+        sumComTax += Number(p.com_tax) || 0;
+        sumPlotTax += Number(p.plot_tax) || 0;
+        sumWaterTax += Number(p.water_tax) || 0;
+        sumSewerTax += Number(p.sewer_tax) || 0;
+        sumTotalTax += Number(p.total_tax) || 0;
+      });
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        showToast('पॉप-अप ब्लॉक हो गया है। कृपया ब्राउज़र सेटिंग्स में पॉप-अप की अनुमति दें।', 'error');
+        return;
+      }
+
+      const rowsHtml = allItems.map(p => `
+        <tr>
+          <td style="text-align: center;">${p.sr_no || ''}</td>
+          <td style="text-align: center; white-space: nowrap;">${p.ward_no ? `वार्ड ${String(p.ward_no).padStart(2, '0')}` : 'वार्ड 01'}</td>
+          <td style="font-weight: 600;">${p.property_id || ''}</td>
+          <td style="text-align: center;">${p.house_no || ''}</td>
+          <td style="font-weight: 600;">${p.owner_name || ''}</td>
+          <td>${p.father_name || ''}</td>
+          <td style="text-align: center;">${p.mobile || ''}</td>
+          <td style="text-align: center;">${p.house_type || ''}</td>
+          <td style="text-align: center;">${p.nirman || ''}</td>
+          <td style="text-align: right;">${p.total_area || 0}</td>
+          <td style="text-align: right;">${p.covered_area || 0}</td>
+          <td style="text-align: right;">₹${(Number(p.total_arv) || 0).toLocaleString('en-IN')}</td>
+          <td style="text-align: right;">₹${(Number(p.res_tax) || 0).toLocaleString('en-IN')}</td>
+          <td style="text-align: right;">₹${(Number(p.com_tax) || 0).toLocaleString('en-IN')}</td>
+          <td style="text-align: right;">₹${(Number(p.plot_tax) || 0).toLocaleString('en-IN')}</td>
+          <td style="text-align: right; color: #1d4ed8; font-weight: 600;">₹${(Number(p.water_tax) || 0).toLocaleString('en-IN')}</td>
+          <td style="text-align: right; color: #15803d; font-weight: 600;">₹${(Number(p.sewer_tax) || 0).toLocaleString('en-IN')}</td>
+          <td style="text-align: right; font-weight: 700; color: #047857;">₹${(Number(p.total_tax) || 0).toLocaleString('en-IN')}</td>
+        </tr>
+      `).join('');
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="hi">
+        <head>
+          <meta charset="utf-8">
+          <title>वार्षिक गृहकर रजिस्टर - ${wardLabel}</title>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 7mm 6mm 10mm 6mm;
+            }
+            * { box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif;
+              margin: 0;
+              padding: 12px;
+              color: #111827;
+              background: #fff;
+              font-size: 10px;
+            }
+            .no-print {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              background: #f8fafc;
+              border: 1px solid #cbd5e1;
+              padding: 10px 16px;
+              margin-bottom: 12px;
+              border-radius: 8px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            }
+            @media print {
+              .no-print { display: none !important; }
+              body { padding: 0; }
+              tr { page-break-inside: avoid; }
+            }
+            .header-box {
+              text-align: center;
+              border-bottom: 2px solid #1e3a8a;
+              padding-bottom: 6px;
+              margin-bottom: 8px;
+            }
+            .palika-title {
+              font-size: 16px;
+              font-weight: 800;
+              color: #1e3a8a;
+              letter-spacing: 0.5px;
+            }
+            .report-title {
+              font-size: 12px;
+              font-weight: 700;
+              color: #374151;
+              margin-top: 2px;
+            }
+            .meta-strip {
+              display: flex;
+              justify-content: space-between;
+              font-size: 10px;
+              font-weight: 600;
+              color: #4b5563;
+              margin-top: 4px;
+              background: #f1f5f9;
+              padding: 4px 10px;
+              border-radius: 4px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 9.5px;
+            }
+            th, td {
+              border: 1px solid #94a3b8;
+              padding: 3.5px 4.5px;
+            }
+            th {
+              background-color: #f1f5f9;
+              font-weight: 700;
+              color: #0f172a;
+              text-align: center;
+              white-space: nowrap;
+            }
+            .totals-row td {
+              background-color: #e2e8f0;
+              font-weight: 800;
+              border-top: 2px solid #0f172a;
+            }
+            .signatures-box {
+              margin-top: 30px;
+              display: flex;
+              justify-content: space-between;
+              padding: 0 40px;
+              page-break-inside: avoid;
+            }
+            .sig-item {
+              text-align: center;
+              font-weight: 700;
+              font-size: 10.5px;
+              border-top: 1px dashed #64748b;
+              padding-top: 5px;
+              min-width: 150px;
+            }
+            .btn {
+              cursor: pointer;
+              padding: 7px 16px;
+              font-weight: 700;
+              border-radius: 6px;
+              font-size: 13px;
+              border: 1px solid #cbd5e1;
+            }
+            .btn-primary { background: #1e40af; color: #fff; border-color: #1e40af; }
+            .btn-secondary { background: #f1f5f9; color: #1e293b; }
+          </style>
+        </head>
+        <body>
+          <div class="no-print">
+            <div style="font-size: 13px; font-weight: 700; color: #1e3a8a;">
+              📄 संपत्ति एवं वार्षिक गृहकर रजिस्टर (${allItems.length} संपत्तियां)
+              <span style="font-size: 11px; font-weight: 500; color: #475569; margin-left: 10px;">
+                💡 टिप: प्रिंट विंडो में 'Destination' में 'Save as PDF' चुनकर सीधे PDF फाइल डाउनलोड कर सकते हैं।
+              </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-primary" onclick="window.print()">🖨️ प्रिंट करें / Save as PDF</button>
+              <button class="btn btn-secondary" onclick="window.close()">✕ बंद करें</button>
+            </div>
+          </div>
+
+          <div class="header-box">
+            <div class="palika-title">🏛️ ${palikaName}</div>
+            <div class="report-title">वार्षिक गृहकर एवं संपत्ति कर निर्धारण संपूर्ण रजिस्टर (House Tax Register) • वित्तीय वर्ष 2026-27</div>
+            <div class="meta-strip">
+              <span><strong>📍 वार्ड:</strong> ${wardLabel}</span>
+              <span><strong>कुल संपत्तियां:</strong> ${allItems.length}</span>
+              <span><strong>वार्षिक ARV योग:</strong> ₹${sumARV.toLocaleString('en-IN')}</span>
+              <span><strong>कुल मांग (Total Tax):</strong> ₹${sumTotalTax.toLocaleString('en-IN')}</span>
+              <span><strong>दिनांक:</strong> ${currentDate}</span>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>क्र.सं.</th>
+                <th>वार्ड</th>
+                <th>प्रॉपर्टी आईडी</th>
+                <th>भवन नं.</th>
+                <th>स्वामी का नाम</th>
+                <th>पिता/पति का नाम</th>
+                <th>मोबाइल</th>
+                <th>प्रकार</th>
+                <th>निर्माण</th>
+                <th>कुल एरिया</th>
+                <th>कवर्ड एरिया</th>
+                <th>नेट ARV (₹)</th>
+                <th>आवासीय (₹)</th>
+                <th>कमर्शियल (₹)</th>
+                <th>प्लॉट कर (₹)</th>
+                <th style="color: #1d4ed8;">जल कर (7.5%)</th>
+                <th style="color: #15803d;">सीवर कर (2.5%)</th>
+                <th style="color: #047857;">कुल गृहकर (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr class="totals-row">
+                <td colspan="11" style="text-align: right; padding-right: 10px;">कुल महायोग (Grand Total):</td>
+                <td style="text-align: right;">₹${sumARV.toLocaleString('en-IN')}</td>
+                <td style="text-align: right;">₹${sumResTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right;">₹${sumComTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right;">₹${sumPlotTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; color: #1d4ed8;">₹${sumWaterTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; color: #15803d;">₹${sumSewerTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; color: #047857; font-size: 10.5px;">₹${sumTotalTax.toLocaleString('en-IN')}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="signatures-box">
+            <div class="sig-item">हस्ताक्षर कर संग्राहक / ऑपरेटर</div>
+            <div class="sig-item">हस्ताक्षर राजस्व निरीक्षक / अधीक्षक</div>
+            <div class="sig-item">हस्ताक्षर अधिशासी अधिकारी (EO) / प्रशासक</div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.open();
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 500);
+
+    } catch (err) {
+      console.error('PDF export error:', err);
+      showToast('पीडीएफ एक्सपोर्ट में त्रुटि', 'error');
+    }
+  };
+
   // If NOT logged in, show the official Login Screen
   if (!currentUser) {
     return (
@@ -565,6 +846,7 @@ export default function App() {
             onDelete={handleDeleteProperty}
             onOwnerClick={handleOwnerClick}
             onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
             currentUser={currentUser}
             currentWardName={currentWardName}
             wards={wards}
