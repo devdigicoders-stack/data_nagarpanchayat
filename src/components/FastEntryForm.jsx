@@ -1,14 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import { Save, RotateCcw, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Save, RotateCcw, Zap, ArrowRightCircle, PlusCircle, CheckCircle2 } from 'lucide-react';
 
 export default function FastEntryForm({ 
   nextIds, 
   settings, 
   editingRecord, 
   onSave, 
-  onCancel 
+  onCancel,
+  wards = []
 }) {
+  const [showWardDropdown, setShowWardDropdown] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const ownerNameInputRef = useRef(null);
+
+  const getSuffixForType = (type) => {
+    switch (type) {
+      case 'Residential': return 'R';
+      case 'Commercial': return 'C';
+      case 'Mixed': return 'M';
+      case 'Plot': return 'P';
+      case 'Government': return 'G';
+      default: return 'R';
+    }
+  };
+
   const [formData, setFormData] = useState({
+    ward_no: 1,
+    ward_name: 'वार्ड 01 - अध्यक्ष',
     property_id: '',
     house_no: '',
     owner_name: '',
@@ -16,8 +34,12 @@ export default function FastEntryForm({
     mobile: '',
     house_type: 'Residential',
     nirman: 'Pakka',
-    road_width: '0 To 09',
+    road_width: '0 से 9 मीटर',
+    total_length: '',
+    total_width: '',
     total_area: 600,
+    covered_length: '',
+    covered_width: '',
     covered_area: 600,
     business_area: 0,
     plot_area: 0,
@@ -25,47 +47,12 @@ export default function FastEntryForm({
     plot_tax_rate: 0.10,
     commercial_tax_rate: 1.00,
     discount_percent: 20,
-    tax_percent: 10
+    tax_percent: 10,
+    has_water_tax: false,
+    water_tax_percent: 7.5,
+    has_sewer_tax: false,
+    sewer_tax_percent: 2.5
   });
-
-  // Load next IDs or editing data
-  useEffect(() => {
-    if (editingRecord) {
-      setFormData({
-        ...editingRecord,
-        total_area: Number(editingRecord.total_area) || 0,
-        covered_area: Number(editingRecord.covered_area) || 0,
-        business_area: Number(editingRecord.business_area) || 0,
-        plot_area: Number(editingRecord.plot_area) || 0,
-        house_tax_rate: Number(editingRecord.house_tax_rate) || 0.40,
-        plot_tax_rate: Number(editingRecord.plot_tax_rate) || 0.10,
-        commercial_tax_rate: Number(editingRecord.commercial_tax_rate) || 1.00,
-        discount_percent: Number(editingRecord.discount_percent ?? 20),
-        tax_percent: Number(editingRecord.tax_percent ?? 10)
-      });
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        property_id: nextIds?.nextPropId || '0903701001010369R',
-        house_no: nextIds?.nextHouse || '10369',
-        owner_name: '',
-        father_name: '',
-        mobile: '',
-        house_type: settings?.sticky_house_type || 'Residential',
-        nirman: settings?.sticky_nirman || 'Pakka',
-        road_width: settings?.sticky_road_width || '0 To 09',
-        total_area: 600,
-        covered_area: 600,
-        business_area: 0,
-        plot_area: 0,
-        house_tax_rate: getRateForNirman(settings?.sticky_nirman || 'Pakka', settings),
-        plot_tax_rate: settings?.plot_rate || 0.10,
-        commercial_tax_rate: settings?.commercial_rate || 1.00,
-        discount_percent: settings?.default_discount_percent ?? 20,
-        tax_percent: settings?.default_tax_percent ?? 10
-      }));
-    }
-  }, [editingRecord, nextIds, settings]);
 
   function getRateForNirman(nirman, setts) {
     if (nirman === 'Pakka') return setts?.pakka_rate || 0.40;
@@ -74,6 +61,88 @@ export default function FastEntryForm({
     if (nirman === 'Plot') return setts?.plot_rate || 0.10;
     return 0.40;
   }
+
+  // Load next IDs or editing data
+  useEffect(() => {
+    if (editingRecord) {
+      setFormData({
+        ...editingRecord,
+        ward_no: editingRecord.ward_no || 1,
+        ward_name: editingRecord.ward_name || 'वार्ड 01 - अध्यक्ष',
+        road_width: editingRecord.road_width || '0 से 9 मीटर',
+        total_length: editingRecord.total_length || '',
+        total_width: editingRecord.total_width || '',
+        total_area: Number(editingRecord.total_area) || 0,
+        covered_length: editingRecord.covered_length || '',
+        covered_width: editingRecord.covered_width || '',
+        covered_area: Number(editingRecord.covered_area) || 0,
+        business_area: Number(editingRecord.business_area) || 0,
+        plot_area: Number(editingRecord.plot_area) || 0,
+        house_tax_rate: Number(editingRecord.house_tax_rate) || 0.40,
+        plot_tax_rate: Number(editingRecord.plot_tax_rate) || 0.10,
+        commercial_tax_rate: Number(editingRecord.commercial_tax_rate) || 1.00,
+        discount_percent: Number(editingRecord.discount_percent ?? 20),
+        tax_percent: Number(editingRecord.tax_percent ?? 10),
+        has_water_tax: Boolean(editingRecord.has_water_tax),
+        water_tax_percent: Number(editingRecord.water_tax_percent ?? 7.5),
+        has_sewer_tax: Boolean(editingRecord.has_sewer_tax),
+        sewer_tax_percent: Number(editingRecord.sewer_tax_percent ?? 2.5)
+      });
+    } else {
+      const savedWardNo = Number(localStorage.getItem('sticky_active_ward_no')) || settings?.active_ward_no || 1;
+      const defaultWard = wards.find(w => w.ward_no === savedWardNo) || wards[0];
+      const targetWardNo = defaultWard?.ward_no || 1;
+      const targetWardName = defaultWard?.ward_name || 'वार्ड 01 - अध्यक्ष';
+      const houseType = settings?.sticky_house_type || 'Residential';
+
+      setFormData(prev => ({
+        ...prev,
+        ward_no: targetWardNo,
+        ward_name: targetWardName,
+        property_id: nextIds?.nextPropId || '0903701001010369R',
+        house_no: nextIds?.nextHouse || '10369',
+        owner_name: '',
+        father_name: '',
+        mobile: '',
+        house_type: houseType,
+        nirman: settings?.sticky_nirman || 'Pakka',
+        road_width: settings?.sticky_road_width || '0 से 9 मीटर',
+        total_length: '',
+        total_width: '',
+        total_area: 600,
+        covered_length: '',
+        covered_width: '',
+        covered_area: 600,
+        business_area: 0,
+        plot_area: 0,
+        house_tax_rate: getRateForNirman(settings?.sticky_nirman || 'Pakka', settings),
+        plot_tax_rate: settings?.plot_rate || 0.10,
+        commercial_tax_rate: settings?.commercial_rate || 1.00,
+        discount_percent: settings?.default_discount_percent ?? 20,
+        tax_percent: settings?.default_tax_percent ?? 10,
+        has_water_tax: false,
+        water_tax_percent: 7.5,
+        has_sewer_tax: false,
+        sewer_tax_percent: 2.5
+      }));
+
+      // If active ward is not ward 1, fetch proper ID for this ward
+      if (targetWardNo !== 1 && (!nextIds || nextIds.ward_no !== targetWardNo)) {
+        fetch(`/api/next-id?ward_no=${targetWardNo}&house_type=${houseType}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.nextPropId) {
+              setFormData(p => ({
+                ...p,
+                property_id: data.nextPropId,
+                house_no: data.nextHouse
+              }));
+            }
+          })
+          .catch(err => console.error('Error fetching ward next ID', err));
+      }
+    }
+  }, [editingRecord, nextIds, settings, wards]);
 
   const handleChange = (field, value) => {
     setFormData(prev => {
@@ -98,12 +167,7 @@ export default function FastEntryForm({
       }
 
       if (field === 'house_type') {
-        let suffix = 'R';
-        if (value === 'Plot') suffix = 'P';
-        else if (value === 'Commercial') suffix = 'C';
-        else if (value === 'Mixed') suffix = 'M';
-        else if (value === 'Government') suffix = 'G';
-
+        const suffix = getSuffixForType(value);
         if (/[A-Z]$/i.test(prev.property_id)) {
           next.property_id = prev.property_id.slice(0, -1) + suffix;
         } else {
@@ -115,16 +179,51 @@ export default function FastEntryForm({
     });
   };
 
+  // Total Area Dimension Handler (Length x Width)
+  const handleTotalDimChange = (dim, val) => {
+    setFormData(prev => {
+      const next = { ...prev, [dim]: val };
+      const l = Number(dim === 'total_length' ? val : prev.total_length);
+      const w = Number(dim === 'total_width' ? val : prev.total_width);
+      if (l > 0 && w > 0) {
+        const calcArea = Math.round(l * w);
+        next.total_area = calcArea;
+        if (!prev.covered_area || prev.covered_area === prev.total_area) {
+          next.covered_area = calcArea;
+        }
+        next.plot_area = Math.max(0, calcArea - (Number(next.covered_area) || 0));
+      }
+      return next;
+    });
+  };
+
+  // Covered Area Dimension Handler (Length x Width)
+  const handleCoveredDimChange = (dim, val) => {
+    setFormData(prev => {
+      const next = { ...prev, [dim]: val };
+      const l = Number(dim === 'covered_length' ? val : prev.covered_length);
+      const w = Number(dim === 'covered_width' ? val : prev.covered_width);
+      if (l > 0 && w > 0) {
+        const calcArea = Math.round(l * w);
+        next.covered_area = calcArea;
+        const tot = Number(next.total_area) || 0;
+        next.plot_area = Math.max(0, tot - calcArea);
+      }
+      return next;
+    });
+  };
+
   const handleToggleSuffix = () => {
     setFormData(prev => {
       const val = prev.property_id.trim();
+      const currentSuffix = getSuffixForType(prev.house_type);
       let updated = val;
-      if (val.endsWith('R')) {
-        updated = val.slice(0, -1);
-      } else if (val.endsWith('P') || val.endsWith('C') || val.endsWith('M') || val.endsWith('G')) {
-        updated = val.slice(0, -1) + 'R';
+      if (val.endsWith(currentSuffix)) {
+        updated = val.slice(0, -currentSuffix.length);
+      } else if (/[A-Z]$/i.test(val)) {
+        updated = val.slice(0, -1) + currentSuffix;
       } else {
-        updated = val + 'R';
+        updated = val + currentSuffix;
       }
       return { ...prev, property_id: updated };
     });
@@ -140,7 +239,7 @@ export default function FastEntryForm({
     }));
   };
 
-  // Live calculation
+  // Live Calculations
   const totalArea = Math.max(0, Number(formData.total_area) || 0);
   const coveredArea = Math.max(0, Number(formData.covered_area) || 0);
   const businessArea = Math.max(0, Number(formData.business_area) || 0);
@@ -167,11 +266,139 @@ export default function FastEntryForm({
   const netARV = resARV + comARV + plotARV;
   const discountAmt = Math.max(0, grossARV - netARV);
 
-  const finalTax = Math.round(netARV * (taxPct / 100));
+  // House Tax (10%)
+  const resTax = Math.round(resARV * (taxPct / 100));
+  const comTax = Math.round(comARV * (taxPct / 100));
+  const plotTax = Math.round(plotARV * (taxPct / 100));
+  const houseTax = resTax + comTax + plotTax;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(formData);
+  // Water Tax (7.5%)
+  const hasWaterTax = Boolean(formData.has_water_tax);
+  const waterTaxPercent = Number(formData.water_tax_percent ?? 7.5);
+  const waterTax = hasWaterTax ? Math.round(netARV * (waterTaxPercent / 100)) : 0;
+
+  // Sewer Tax (2.5%)
+  const hasSewerTax = Boolean(formData.has_sewer_tax);
+  const sewerTaxPercent = Number(formData.sewer_tax_percent ?? 2.5);
+  const sewerTax = hasSewerTax ? Math.round(netARV * (sewerTaxPercent / 100)) : 0;
+
+  // Total Demand
+  const finalTax = houseTax + waterTax + sewerTax;
+
+  const handleWardSelect = async (wNo) => {
+    const num = Number(wNo);
+    const found = wards.find(w => w.ward_no === num);
+    const wName = found ? found.ward_name : `वार्ड ${String(num).padStart(2, '0')}`;
+    
+    localStorage.setItem('sticky_active_ward_no', String(num));
+
+    setFormData(prev => ({
+      ...prev,
+      ward_no: num,
+      ward_name: wName
+    }));
+
+    if (!editingRecord) {
+      try {
+        const res = await fetch(`/api/next-id?ward_no=${num}&house_type=${formData.house_type}`);
+        const data = await res.json();
+        if (res.ok) {
+          setFormData(prev => ({
+            ...prev,
+            property_id: data.nextPropId || prev.property_id,
+            house_no: data.nextHouse || prev.house_no
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to get next ID for ward', err);
+      }
+    }
+  };
+
+  // Submit Handler: supports regular Save or Save & Next
+  const handleSubmit = async (e, isSaveAndNext = false) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    localStorage.setItem('sticky_active_ward_no', String(formData.ward_no));
+
+    const submissionData = {
+      ...formData,
+      total_length: Number(formData.total_length) || 0,
+      total_width: Number(formData.total_width) || 0,
+      total_area: totalArea,
+      covered_length: Number(formData.covered_length) || 0,
+      covered_width: Number(formData.covered_width) || 0,
+      covered_area: coveredArea,
+      business_area: businessArea,
+      plot_area: plotArea,
+      res_tax: resTax,
+      com_tax: comTax,
+      plot_tax: plotTax,
+      house_tax: houseTax,
+      water_tax: waterTax,
+      sewer_tax: sewerTax,
+      total_tax: finalTax
+    };
+
+    try {
+      const saved = await onSave(submissionData);
+
+      if (isSaveAndNext) {
+        // Fetch next ID for the active ward
+        const currentWardNo = formData.ward_no || 1;
+        const currentHouseType = formData.house_type || 'Residential';
+        let newPropId = '';
+        let newHouseNo = '';
+
+        try {
+          const res = await fetch(`/api/next-id?ward_no=${currentWardNo}&house_type=${currentHouseType}`);
+          const data = await res.json();
+          if (res.ok) {
+            newPropId = data.nextPropId;
+            newHouseNo = data.nextHouse;
+          }
+        } catch (fetchErr) {
+          console.error('Next id fetch error', fetchErr);
+        }
+
+        // If fetch didn't return, fallback to numeric advance
+        if (!newHouseNo) {
+          const parsed = parseInt(String(formData.house_no).replace(/\D/g, ''), 10);
+          newHouseNo = parsed ? String(parsed + 1) : '10370';
+          const prefix = formData.property_id.slice(0, 11) || '09037010010';
+          const suffix = getSuffixForType(currentHouseType);
+          newPropId = `${prefix}${newHouseNo.padStart(5, '0')}${suffix}`;
+        }
+
+        // Reset fields for the next entry while preserving sticky settings
+        setFormData(prev => ({
+          ...prev,
+          property_id: newPropId,
+          house_no: newHouseNo,
+          owner_name: '',
+          father_name: '',
+          mobile: '',
+          total_length: '',
+          total_width: '',
+          covered_length: '',
+          covered_width: '',
+          business_area: 0
+        }));
+
+        // Focus owner name for lightning-fast next entry
+        setTimeout(() => {
+          if (ownerNameInputRef.current) {
+            ownerNameInputRef.current.focus();
+          }
+        }, 150);
+      }
+    } catch (err) {
+      console.error('Save failed', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -179,10 +406,10 @@ export default function FastEntryForm({
       <div className="card-header">
         <div>
           <div className="card-title">
-            {editingRecord ? `✏️ प्रविष्टि संपादन (क्र.सं. ${editingRecord.sr_no})` : '✍️ नया गृहकर निर्धारण एवं डेटा प्रविष्टि'}
+            {editingRecord ? `✏️ प्रविष्टि संपादन (क्र.सं. ${editingRecord.sr_no})` : '✍️ नया कर निर्धारण एवं डेटा प्रविष्टि'}
           </div>
           <div className="card-desc">
-            वार्ड 01 अध्यक्ष प्रारूप के अनुसार स्वतः आईडी जनरेशन एवं ऑटो-कैलकुलेटर (MongoDB Sync)
+            {formData.ward_name} • स्वतः 17-अंक आईडी • लम्बाई × चौड़ाई कैलकुलेटर • जलकर/सीवर कर विकल्प
           </div>
         </div>
         <div>
@@ -200,11 +427,16 @@ export default function FastEntryForm({
                   owner_name: '',
                   father_name: '',
                   mobile: '',
+                  total_length: '',
+                  total_width: '',
                   total_area: 600,
+                  covered_length: '',
+                  covered_width: '',
                   covered_area: 600,
                   business_area: 0,
                   plot_area: 0
                 }));
+                ownerNameInputRef.current?.focus();
               }}
             >
               <RotateCcw size={13} /> फॉर्म रीसेट
@@ -214,20 +446,79 @@ export default function FastEntryForm({
       </div>
 
       <div className="card-body">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={(e) => handleSubmit(e, false)}>
           <div className="form-grid">
             
-            {/* Property ID */}
+            {/* Ward Status Bar - Automatic & Sticky */}
+            <div className="form-group" style={{ gridColumn: '1 / -1', background: 'var(--primary-light)', padding: '10px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-light)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: '1.25rem' }}>🏛️</span>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      सक्रिय प्रविष्टि वार्ड (Active Entry Ward):
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                      <strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>
+                        {formData.ward_name}
+                      </strong>
+                      <span className="badge-auto" style={{ background: '#dcfce7', color: '#166534', fontWeight: 700, fontSize: '0.75rem' }}>
+                        ✓ स्वतः लॉक (हर बार चुनने की आवश्यकता नहीं)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-outline btn-xs"
+                  onClick={() => setShowWardDropdown(!showWardDropdown)}
+                  style={{ background: 'var(--bg-card)', fontSize: '0.78rem', borderColor: 'var(--primary)' }}
+                >
+                  {showWardDropdown ? '✕ छिपाएं' : '🔁 दूसरा वार्ड चुनें'}
+                </button>
+              </div>
+
+              {showWardDropdown && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed var(--primary)' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--primary)', marginBottom: 4 }}>
+                    अन्य वार्ड चुनें (केवल तभी जब किसी दूसरे वार्ड में एंट्री करनी हो):
+                  </label>
+                  <select
+                    className="form-control"
+                    value={formData.ward_no}
+                    onChange={(e) => {
+                      handleWardSelect(e.target.value);
+                      setShowWardDropdown(false);
+                    }}
+                    style={{ fontWeight: 600, fontSize: '0.9rem', background: 'var(--bg-card)' }}
+                  >
+                    {wards && wards.length > 0 ? (
+                      wards.map(w => (
+                        <option key={w.ward_no} value={w.ward_no}>
+                          📍 वार्ड {String(w.ward_no).padStart(2, '0')} — {w.ward_name} {w.parshad_name ? `(पार्षद: ${w.parshad_name})` : ''}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="1">📍 वार्ड 01 — अध्यक्ष</option>
+                    )}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Property ID (16 Digits + 1 Letter = 17 Chars) */}
             <div className="form-group">
               <label className="form-label">
-                <span>प्रॉपर्टी आईडी (Property ID)</span>
-                <span className="badge-auto">स्वतः जनरेटेड</span>
+                <span>प्रॉपर्टी आईडी (17 अक्षर: 16 अंक + श्रेणी कोड)</span>
+                <span className="badge-auto">17 Chars</span>
               </label>
               <div className="input-group">
                 <input
                   type="text"
                   className="form-control"
                   value={formData.property_id}
+                  maxLength={17}
                   onChange={(e) => handleChange('property_id', e.target.value)}
                   required
                 />
@@ -235,13 +526,15 @@ export default function FastEntryForm({
                   type="button"
                   className="btn btn-outline"
                   onClick={handleToggleSuffix}
-                  title="पीछे 'R' लगाएं या हटाएं"
+                  title="पीछे स्पेशल लेटर लगाएं या हटाएं"
                   style={{ borderRadius: '0 var(--radius-md) var(--radius-md) 0' }}
                 >
-                  ± R / Suffix
+                  ± {getSuffixForType(formData.house_type)} / Suffix
                 </button>
               </div>
-              <div className="form-note">अगला नंबर अपने आप आ जाता है। 'R' या अन्य कोड बदल सकते हैं।</div>
+              <div className="form-note">
+                16 अंक + '{getSuffixForType(formData.house_type)}' (R-आवास, C-कमर्शियल, M-मिक्स, P-प्लॉट, G-सरकारी)
+              </div>
             </div>
 
             {/* House No */}
@@ -259,8 +552,9 @@ export default function FastEntryForm({
 
             {/* Owner Name */}
             <div className="form-group">
-              <label className="form-label">भवन स्वामी का नाम (Owner Name)</label>
+              <label className="form-label">भवन स्वामी का नाम (Owner Name) *</label>
               <input
+                ref={ownerNameInputRef}
                 type="text"
                 className="form-control"
                 placeholder="उदा. राम प्रसाद"
@@ -303,11 +597,11 @@ export default function FastEntryForm({
                 onChange={(e) => handleChange('house_type', e.target.value)}
                 required
               >
-                <option value="Residential">Residential (आवासीय)</option>
-                <option value="Commercial">Commercial (व्यावसायिक)</option>
-                <option value="Mixed">Mixed (मिश्रित - रिहायशी + दुकान)</option>
-                <option value="Plot">Plot (रिक्त भूखंड)</option>
-                <option value="Government">Government (सरकारी / धार्मिक)</option>
+                <option value="Residential">Residential (आवासीय - कोड 'R')</option>
+                <option value="Commercial">Commercial (व्यावसायिक - कोड 'C')</option>
+                <option value="Mixed">Mixed (मिश्रित: दुकान + आवास - कोड 'M')</option>
+                <option value="Plot">Plot (रिक्त भूखंड - कोड 'P')</option>
+                <option value="Government">Government (सरकारी / धार्मिक - कोड 'G')</option>
               </select>
             </div>
 
@@ -331,10 +625,10 @@ export default function FastEntryForm({
               <div className="form-note">जब तक बदलेंगे नहीं, यह पिछली प्रविष्टि का मान ही दिखाएगा।</div>
             </div>
 
-            {/* Road Width (Sticky) */}
+            {/* Road Width in Meters (Sticky) */}
             <div className="form-group">
               <label className="form-label">
-                <span>सड़क की चौड़ाई (Road Width)</span>
+                <span>सड़क की चौड़ाई (Road Width in Meters)</span>
                 <span className="sticky-indicator"><Zap size={12} /> ऑटो-मेमोरी</span>
               </label>
               <select
@@ -343,102 +637,365 @@ export default function FastEntryForm({
                 onChange={(e) => handleChange('road_width', e.target.value)}
                 required
               >
-                <option value="0 To 09">0 To 09 फीट</option>
-                <option value="09 To 12">09 To 12 फीट</option>
-                <option value="12 To 24">12 To 24 फीट</option>
-                <option value="24 To 40">24 To 40 फीट</option>
-                <option value="40 Plus">&gt; 40 फीट</option>
+                <option value="0 से 9 मीटर">0 से 9 मीटर (9 मीटर तक चौड़ी)</option>
+                <option value="9 से 12 मीटर">9 से 12 मीटर तक चौड़ी</option>
+                <option value="12 से 24 मीटर">12 से 24 मीटर तक चौड़ी</option>
+                <option value="24 मीटर से अधिक">24 मीटर से अधिक चौड़ी</option>
+                {/* Fallbacks for older DB entries */}
+                <option value="0 To 09" style={{ display: 'none' }}>0 To 09</option>
+                <option value="09 To 12" style={{ display: 'none' }}>09 To 12</option>
+                <option value="12 To 24" style={{ display: 'none' }}>12 To 24</option>
+                <option value="24 To 40" style={{ display: 'none' }}>24 To 40</option>
               </select>
-              <div className="form-note">गली बदलते समय ही इसे बदलने की आवश्यकता होगी।</div>
+              <div className="form-note">सड़क की चौड़ाई मानक मीटर में दर्ज है।</div>
             </div>
           </div>
 
-          {/* Area Details */}
-          <div style={{ marginTop: '1.5rem' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.8rem', color: 'var(--text-primary)' }}>
-              📐 क्षेत्रफल विवरण (Area Details in Square Feet)
-            </h3>
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">कुल क्षेत्रफल (Total Area)</label>
-                <div className="input-group">
-                  <input
-                    type="number"
-                    className="form-control"
-                    min="0"
-                    step="1"
-                    value={formData.total_area}
-                    onChange={(e) => handleChange('total_area', e.target.value)}
-                    required
-                  />
-                  <span className="input-addon">वर्ग फुट</span>
+          {/* Area Details with Length x Width Calculation */}
+          <div style={{ marginTop: '1.5rem', background: 'var(--bg-subtle)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: 8 }}>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                📐 क्षेत्रफल विवरण एवं स्वतः कैलकुलेटर (Length × Width Calculator)
+              </h3>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                लंबाई व चौड़ाई डालने पर कुल क्षेत्रफल स्वतः निकल जाता है
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              
+              {/* Total Area Box */}
+              <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--primary)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>1. कुल क्षेत्रफल (Total Area)</span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>लंबाई × चौड़ाई</span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>लंबाई (फीट)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="उदा. 30"
+                      className="form-control"
+                      value={formData.total_length}
+                      onChange={(e) => handleTotalDimChange('total_length', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>चौड़ाई (फीट)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="उदा. 20"
+                      className="form-control"
+                      value={formData.total_width}
+                      onChange={(e) => handleTotalDimChange('total_width', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>कुल क्षेत्रफल (वर्ग फुट) *</span>
+                    {formData.total_length > 0 && formData.total_width > 0 && (
+                      <span className="badge-auto" style={{ background: '#e0f2fe', color: '#0369a1' }}>
+                        ✓ {formData.total_length} × {formData.total_width} = {totalArea}
+                      </span>
+                    )}
+                  </label>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="0"
+                      step="any"
+                      value={formData.total_area}
+                      onChange={(e) => handleChange('total_area', e.target.value)}
+                      required
+                      style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--primary)' }}
+                    />
+                    <span className="input-addon">वर्ग फुट</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">
-                  <span>कवर्ड एरिया (Covered Area)</span>
+              {/* Covered Area Box */}
+              <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#059669', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>2. कवर्ड एरिया (Covered Area)</span>
                   <button
                     type="button"
-                    className="btn btn-outline btn-sm"
+                    className="btn btn-outline btn-xs"
                     onClick={handle80Percent}
-                    style={{ padding: '0.1rem 0.4rem', fontSize: '0.7rem' }}
+                    style={{ padding: '2px 6px', fontSize: '0.72rem', borderColor: '#10b981', color: '#059669' }}
+                    title="कुल क्षेत्रफल का 80% कवर्ड सेट करें"
                   >
-                    80% भरें
+                    ⚡ 80% भरें
                   </button>
-                </label>
-                <div className="input-group">
-                  <input
-                    type="number"
-                    className="form-control"
-                    min="0"
-                    step="1"
-                    value={formData.covered_area}
-                    onChange={(e) => handleChange('covered_area', e.target.value)}
-                    required
-                  />
-                  <span className="input-addon">वर्ग फुट</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>कवर्ड लंबाई (फीट)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="उदा. 24"
+                      className="form-control"
+                      value={formData.covered_length}
+                      onChange={(e) => handleCoveredDimChange('covered_length', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>कवर्ड चौड़ाई (फीट)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="उदा. 20"
+                      className="form-control"
+                      value={formData.covered_width}
+                      onChange={(e) => handleCoveredDimChange('covered_width', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>कवर्ड क्षेत्रफल (वर्ग फुट) *</span>
+                    {formData.covered_length > 0 && formData.covered_width > 0 && (
+                      <span className="badge-auto" style={{ background: '#dcfce7', color: '#15803d' }}>
+                        ✓ {formData.covered_length} × {formData.covered_width} = {coveredArea}
+                      </span>
+                    )}
+                  </label>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="0"
+                      step="any"
+                      value={formData.covered_area}
+                      onChange={(e) => handleChange('covered_area', e.target.value)}
+                      required
+                      style={{ fontWeight: 700, fontSize: '1rem', color: '#059669' }}
+                    />
+                    <span className="input-addon">वर्ग फुट</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">दुकान / बिजनेस एरिया (Business Area)</label>
+              {/* Plot Area / Open Ground Box */}
+              <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#d97706', marginBottom: 8 }}>
+                  3. खुला / प्लॉट एरिया (Open Area)
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>रिक्त प्लॉट क्षेत्रफल (वर्ग फुट)</label>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="0"
+                      step="any"
+                      value={formData.plot_area}
+                      onChange={(e) => handleChange('plot_area', e.target.value)}
+                      style={{ fontWeight: 600 }}
+                    />
+                    <span className="input-addon">वर्ग फुट</span>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', background: 'var(--bg-subtle)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
+                  💡 <strong>स्वतः सूत्र:</strong> {totalArea} कुल - {coveredArea} कवर्ड = <strong>{plotArea} वर्ग फुट</strong> खुला प्लॉट
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Mixed Property Breakdown (दुकान + रिहायशी आवास + खुला प्लॉट) */}
+          {formData.house_type === 'Mixed' ? (
+            <div style={{ marginTop: '1.25rem', padding: '16px', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(59, 130, 246, 0.08))', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '1.3rem' }}>🏪</span>
+                  <div>
+                    <strong style={{ fontSize: '0.95rem', color: '#b45309' }}>
+                      मिक्स प्रॉपर्टी (Mixed Property) - दुकान + आवास विभाजन
+                    </strong>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      दुकान (व्यावसायिक) और रिहायशी आवास का अलग-अलग क्षेत्रफल और टैक्स गणना:
+                    </div>
+                  </div>
+                </div>
+                <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
+                  मिक्स मोड सक्रिय (कोड: 'M')
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                
+                {/* Shop / Commercial Portion */}
+                <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fde68a' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 700 }}>
+                    🏪 दुकान / व्यावसायिक एरिया (Business Area) *
+                  </label>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="0"
+                      max={coveredArea}
+                      step="any"
+                      placeholder="दुकान का क्षेत्रफल"
+                      value={formData.business_area}
+                      onChange={(e) => handleChange('business_area', e.target.value)}
+                      required
+                      style={{ fontWeight: 700, color: '#b45309', fontSize: '1rem' }}
+                    />
+                    <span className="input-addon">sq.ft.</span>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                    दर: ₹{comRate}/sqft • टैक्स: <strong>₹{comTax}</strong>
+                  </div>
+                </div>
+
+                {/* Residential Portion (Auto-Calculated) */}
+                <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 700 }}>
+                    🏠 रिहायशी आवास भाग (Residential Area)
+                  </label>
+                  <div style={{ padding: '8px 10px', background: '#eff6ff', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '1.05rem', color: '#1e3a8a' }}>
+                    {resArea} वर्ग फुट
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                    स्वतः ({coveredArea} कवर्ड - {businessArea} दुकान) • दर: ₹{houseRate}/sqft • टैक्स: <strong>₹{resTax}</strong>
+                  </div>
+                </div>
+
+                {/* Plot Portion */}
+                <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fed7aa' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#c2410c', fontWeight: 700 }}>
+                    🌱 रिक्त प्लॉट भाग (Plot Area)
+                  </label>
+                  <div style={{ padding: '8px 10px', background: '#fff7ed', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '1.05rem', color: '#c2410c' }}>
+                    {plotArea} वर्ग फुट
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                    दर: ₹{plotRate}/sqft • टैक्स: <strong>₹{plotTax}</strong>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label className="form-label" style={{ fontSize: '0.8rem' }}>दुकान / बिजनेस एरिया (Business Area यदि कोई हो)</label>
                 <div className="input-group">
                   <input
                     type="number"
                     className="form-control"
                     min="0"
-                    step="1"
+                    step="any"
                     value={formData.business_area}
                     onChange={(e) => handleChange('business_area', e.target.value)}
                   />
                   <span className="input-addon">वर्ग फुट</span>
                 </div>
-                <div className="form-note">मिश्रित/कमर्शियल संपत्ति होने पर भरें</div>
               </div>
+              <div style={{ flex: 2, fontSize: '0.75rem', color: 'var(--text-secondary)', paddingTop: 18 }}>
+                यदि संपत्ति में दुकान व आवास दोनों हैं, तो ऊपर <strong>हाउस टाइप में "Mixed"</strong> चुनें।
+              </div>
+            </div>
+          )}
 
-              <div className="form-group">
-                <label className="form-label">खुला / प्लॉट एरिया (Open Plot Area)</label>
-                <div className="input-group">
-                  <input
-                    type="number"
-                    className="form-control"
-                    min="0"
-                    step="1"
-                    value={formData.plot_area}
-                    onChange={(e) => handleChange('plot_area', e.target.value)}
-                  />
-                  <span className="input-addon">वर्ग फुट</span>
-                </div>
-                <div className="form-note">कुल क्षेत्रफल - कवर्ड एरिया = स्वतः खाली भाग</div>
+          {/* Water & Sewer Tax Options (जल टैक्स 7.5% एवं सीवर टैक्स 2.5%) */}
+          <div style={{ marginTop: '1.25rem', padding: '14px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🚰 जलकर एवं सीवर कर विकल्प (Water & Sewer Tax Demand)</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  (डेटा इनपुट देने पर ही टैक्स मांग में दिखाई देगा)
+                </span>
               </div>
+              {(hasWaterTax || hasSewerTax) && (
+                <span className="badge-auto" style={{ background: '#dcfce7', color: '#166534' }}>
+                  अतिरिक्त कर लागू: +₹{waterTax + sewerTax}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+              
+              {/* Water Tax Checkbox */}
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 12, 
+                padding: '10px 14px', 
+                background: formData.has_water_tax ? '#eff6ff' : 'var(--bg-card)', 
+                border: formData.has_water_tax ? '1.5px solid #3b82f6' : '1px solid var(--border-color)', 
+                borderRadius: 'var(--radius-md)', 
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={formData.has_water_tax}
+                  onChange={(e) => handleChange('has_water_tax', e.target.checked)}
+                  style={{ width: 20, height: 20, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: formData.has_water_tax ? '#1d4ed8' : 'inherit', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>🚰 जलकर (Water Tax - 7.5%)</span>
+                    {formData.has_water_tax && <span style={{ color: '#1d4ed8' }}>₹{waterTax}</span>}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    शुद्ध मूल्यांकन (Net ARV ₹{netARV}) का 7.5%
+                  </div>
+                </div>
+              </label>
+
+              {/* Sewer Tax Checkbox */}
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 12, 
+                padding: '10px 14px', 
+                background: formData.has_sewer_tax ? '#f0fdf4' : 'var(--bg-card)', 
+                border: formData.has_sewer_tax ? '1.5px solid #10b981' : '1px solid var(--border-color)', 
+                borderRadius: 'var(--radius-md)', 
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={formData.has_sewer_tax}
+                  onChange={(e) => handleChange('has_sewer_tax', e.target.checked)}
+                  style={{ width: 20, height: 20, cursor: 'pointer', accentColor: '#10b981' }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: formData.has_sewer_tax ? '#15803d' : 'inherit', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>🚽 सीवर कर (Sewer Tax - 2.5%)</span>
+                    {formData.has_sewer_tax && <span style={{ color: '#15803d' }}>₹{sewerTax}</span>}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    शुद्ध मूल्यांकन (Net ARV ₹{netARV}) का 2.5%
+                  </div>
+                </div>
+              </label>
+
             </div>
           </div>
 
           {/* Rates and Discount Overrides */}
-          <div style={{ marginTop: '1.5rem' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.8rem', color: 'var(--text-primary)' }}>
-              ⚙️ टैक्स दरें एवं छूट विन्यास (Rates, Discount & Tax %)
+          <div style={{ marginTop: '1.25rem' }}>
+            <h3 style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: '0.6rem', color: 'var(--text-primary)' }}>
+              ⚙️ लागू कर दरें एवं छूट विन्यास (Rates, Discount & Tax %)
             </h3>
             <div className="form-grid">
               <div className="form-group">
@@ -508,12 +1065,14 @@ export default function FastEntryForm({
           </div>
 
           {/* Live Reactive Calculator Box */}
-          <div className="live-calc-box">
+          <div className="live-calc-box" style={{ marginTop: '1.25rem' }}>
             <div className="live-calc-header">
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}>
-                🧮 लाइव गणना पूर्वावलोकन (Live Real-Time Tax Calculation)
+                🧮 लाइव गणना पूर्वावलोकन (Real-Time Municipal Tax Calculation)
               </h4>
-              <span className="badge-auto" style={{ background: '#10b981', color: '#fff' }}>स्वतः गणना</span>
+              <span className="badge-auto" style={{ background: '#10b981', color: '#fff' }}>
+                स्वतः गणना
+              </span>
             </div>
             <div className="calc-steps-grid">
               <div className="calc-step-card">
@@ -536,24 +1095,75 @@ export default function FastEntryForm({
                 <div className="val" style={{ color: 'var(--primary)' }}>₹{netARV.toLocaleString('en-IN')}</div>
               </div>
 
+              <div className="calc-step-card">
+                <div className="label">गृहकर (House Tax 10%)</div>
+                <div className="val">₹{houseTax.toLocaleString('en-IN')}</div>
+              </div>
+
+              {/* Water Tax Step Card (Shown only if checked) */}
+              {hasWaterTax && (
+                <div className="calc-step-card" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
+                  <div className="label" style={{ color: '#1d4ed8' }}>🚰 जलकर (Water 7.5%)</div>
+                  <div className="val" style={{ color: '#1d4ed8' }}>₹{waterTax.toLocaleString('en-IN')}</div>
+                </div>
+              )}
+
+              {/* Sewer Tax Step Card (Shown only if checked) */}
+              {hasSewerTax && (
+                <div className="calc-step-card" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                  <div className="label" style={{ color: '#15803d' }}>🚽 सीवर कर (Sewer 2.5%)</div>
+                  <div className="val" style={{ color: '#15803d' }}>₹{sewerTax.toLocaleString('en-IN')}</div>
+                </div>
+              )}
+
               <div className="calc-step-card highlight">
-                <div className="label">कुल वार्षिक देय गृहकर (Annual Tax)</div>
+                <div className="label">
+                  कुल वार्षिक कर मांग {hasWaterTax || hasSewerTax ? '(गृहकर + अतिरिक्त कर)' : '(Annual House Tax)'}
+                </div>
                 <div className="val">₹{finalTax.toLocaleString('en-IN')}</div>
               </div>
             </div>
           </div>
 
-          {/* Action Button */}
-          <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.85rem' }}>
-            {editingRecord && (
-              <button type="button" className="btn btn-outline" onClick={onCancel}>
-                रद्द करें
-              </button>
+          {/* Action Buttons: Save & Next (सेव एंड अगला भरें) vs Regular Save */}
+          <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+            {editingRecord ? (
+              <>
+                <button type="button" className="btn btn-outline" onClick={onCancel} disabled={isSubmitting}>
+                  रद्द करें
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ minWidth: 200 }} disabled={isSubmitting}>
+                  <Save size={15} />
+                  <span>{isSubmitting ? 'सुरक्षित हो रहा है...' : 'बदलाव सुरक्षित करें (Update)'}</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={(e) => handleSubmit(e, false)}
+                  disabled={isSubmitting}
+                  style={{ minWidth: 150 }}
+                  title="सुरक्षित करें और रजिस्टर पर जाएं"
+                >
+                  <Save size={15} />
+                  <span>केवल सुरक्षित करें</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={(e) => handleSubmit(e, true)}
+                  disabled={isSubmitting}
+                  style={{ minWidth: 240, padding: '0.65rem 1.4rem', fontSize: '0.95rem', fontWeight: 700, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderColor: '#059669', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}
+                  title="डेटा सेव करके तुरंत अगली प्रविष्टि हेतु फॉर्म ब्लैंक करें"
+                >
+                  <PlusCircle size={17} />
+                  <span>{isSubmitting ? 'सुरक्षित हो रहा है...' : '💾 सुरक्षित करें एवं अगला भरें (Save & Next)'}</span>
+                </button>
+              </>
             )}
-            <button type="submit" className="btn btn-primary" style={{ minWidth: 180 }}>
-              <Save size={15} />
-              <span>{editingRecord ? 'बदलाव सुरक्षित करें (Update)' : 'सुरक्षित करें (Save Record)'}</span>
-            </button>
           </div>
         </form>
       </div>

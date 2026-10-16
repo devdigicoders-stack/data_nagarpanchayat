@@ -3,6 +3,9 @@ import { Moon, Sun, PlusCircle, Database, User, LogOut, KeyRound, Shield, Chevro
 
 export default function Header({ 
   wardName = 'वार्ड 01 - अध्यक्ष', 
+  wards = [],
+  selectedWard = 'all',
+  onSelectWard,
   dbConnected = false, 
   theme = 'light', 
   currentUser = null,
@@ -55,7 +58,36 @@ export default function Header({
                 डिजिटल गृहकर<span className="brand-heading-suffix"> प्रबंधन प्रणाली</span>
               </h1>
               <div className="brand-badges-row">
-                <span className="badge-ward">{wardName}</span>
+                {wards && wards.length > 0 ? (
+                  <div className="ward-selector-badge" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <select
+                      className="header-ward-select"
+                      value={selectedWard}
+                      onChange={(e) => onSelectWard && onSelectWard(e.target.value)}
+                      title="वार्ड फ़िल्टर बदलें"
+                      style={{
+                        background: 'var(--primary-light)',
+                        color: 'var(--primary)',
+                        border: '1px solid var(--primary)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '2px 8px',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="all">🏛️ सभी वार्ड (All Wards)</option>
+                      {wards.map(w => (
+                        <option key={w.ward_no} value={w.ward_no}>
+                          📍 वार्ड {String(w.ward_no).padStart(2, '0')} - {w.ward_name.replace(/^वार्ड\s*\d+\s*[-–]?\s*/i, '')} {w.property_count ? `(${w.property_count})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <span className="badge-ward">{wardName}</span>
+                )}
                 <span className={`db-status-badge ${dbConnected ? 'connected' : 'disconnected'}`}>
                   <span className="db-dot" />
                   <Database size={11} className="db-icon" />

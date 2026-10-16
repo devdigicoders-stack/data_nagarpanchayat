@@ -991,46 +991,186 @@ body {
   padding-top: 0.3rem;
 }
 
-/* Print CSS */
+/* Print CSS - Isolated Assessment Slip Print */
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
   }
-  
+
+  /* Completely HIDE all background elements, navigation, dashboard, tables, and modal controls */
+  .app-container,
   .top-header,
   .main-nav,
-  .stats-grid,
-  .toolbar-container,
-  .pagination-container,
+  .toast-container,
+  .modal-header,
   .modal-footer,
-  .card-header,
   .btn,
-  .hide-on-print {
+  .hide-on-print,
+  button {
     display: none !important;
   }
 
-  .modal-overlay {
-    position: static !important;
-    background: transparent !important;
-    padding: 0 !important;
-    display: block !important;
+  /* Ensure when slip modal is active, any root wrapper child other than modal is hidden */
+  body.print-slip-active .app-root-wrapper > *:not(.modal-overlay) {
+    display: none !important;
   }
 
-  .modal-content {
+  /* Flatten modal containers so only the inner slip prints */
+  .modal-overlay,
+  .modal-backdrop {
+    position: static !important;
+    display: block !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    box-shadow: none !important;
+  }
+
+  .modal-content,
+  .modal-card {
+    position: static !important;
+    display: block !important;
     border: none !important;
     box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
     max-width: 100% !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: none !important;
   }
 
   .modal-body {
     padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
   }
 
+  /* Assessment Slip Formatting for crisp Single Page A4 Print */
   .assessment-slip {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 8mm 10mm !important;
     border: 2px solid #000000 !important;
-    padding: 1.5rem !important;
-    page-break-after: always;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-sizing: border-box !important;
+  }
+
+  .slip-header {
+    text-align: center !important;
+    border-bottom: 2px solid #000000 !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .slip-emblem {
+    font-size: 1.3rem !important;
+    margin-bottom: 2px !important;
+  }
+
+  .slip-header h2 {
+    font-size: 1.2rem !important;
+    font-weight: 800 !important;
+    color: #000000 !important;
+    margin: 0 !important;
+  }
+
+  .slip-header h3 {
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    color: #1e3a8a !important;
+    margin: 2px 0 !important;
+  }
+
+  .slip-header p {
+    font-size: 0.8rem !important;
+    color: #334155 !important;
+    margin: 0 !important;
+  }
+
+  .slip-meta-bar {
+    display: flex !important;
+    justify-content: space-between !important;
+    border-bottom: 1px dashed #000000 !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 6px !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+  }
+
+  .slip-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 6px !important;
+    font-size: 0.8rem !important;
+  }
+
+  .slip-table th,
+  .slip-table td {
+    border: 1px solid #000000 !important;
+    padding: 3px 6px !important;
+    color: #000000 !important;
+  }
+
+  .slip-table th {
+    background-color: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-weight: 700 !important;
+  }
+
+  .slip-total-banner {
+    background-color: #f8fafc !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    border: 1.5px solid #000000 !important;
+    padding: 5px 10px !important;
+    margin: 6px 0 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    font-size: 0.92rem !important;
+  }
+
+  .slip-signatures {
+    display: flex !important;
+    justify-content: space-between !important;
+    margin-top: 1.5rem !important;
+    padding-top: 0.3rem !important;
+    font-size: 0.78rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .slip-sign-box {
+    text-align: center !important;
+    width: 160px !important;
+    border-top: 1px solid #000000 !important;
+    padding-top: 2px !important;
   }
 }
 

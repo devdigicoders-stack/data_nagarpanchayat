@@ -23,8 +23,17 @@ export default function RegisterTable({
   onDelete,
   onOwnerClick,
   onExportCSV,
-  currentUser = null
+  currentUser = null,
+  currentWardName = 'सभी वार्ड',
+  wards = [],
+  selectedWard = 'all'
 }) {
+  const [exportWard, setExportWard] = React.useState(selectedWard || 'all');
+
+  React.useEffect(() => {
+    setExportWard(selectedWard || 'all');
+  }, [selectedWard]);
+
   const startIdx = total === 0 ? 0 : (page - 1) * limit + 1;
   const endIdx = Math.min(page * limit, total);
 
@@ -32,11 +41,33 @@ export default function RegisterTable({
     <div className="content-card">
       <div className="card-header">
         <div>
-          <div className="card-title">📑 वार्ड 01 अध्यक्ष - संपूर्ण संपत्ति एवं गृहकर रजिस्टर</div>
+          <div className="card-title">📑 {currentWardName} - संपूर्ण संपत्ति एवं गृहकर रजिस्टर</div>
           <div className="card-desc">MongoDB डेटाबेस • सर्च, फिल्टर, संपादन और 1-क्लिक प्रिंट पर्ची की सुविधा</div>
         </div>
-        <div className="card-header-actions">
-          <button className="btn btn-success btn-sm" onClick={onExportCSV}>
+        <div className="card-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-subtle)', padding: '3px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>वार्ड:</span>
+            <select
+              className="form-control"
+              style={{ width: 'auto', padding: '3px 6px', fontSize: '0.82rem', fontWeight: 600, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              value={exportWard}
+              onChange={(e) => setExportWard(e.target.value)}
+              title="एक्सपोर्ट करने हेतु वार्ड चुनें"
+            >
+              <option value="all">📊 सभी वार्ड (संपूर्ण निकाय)</option>
+              {wards && wards.map(w => (
+                <option key={w.ward_no} value={w.ward_no}>
+                  📍 वार्ड {String(w.ward_no).padStart(2, '0')} - {w.ward_name.replace(/^वार्ड\s*\d+\s*[-–]?\s*/i, '')} {w.property_count ? `(${w.property_count})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button 
+            className="btn btn-success btn-sm" 
+            onClick={() => onExportCSV(exportWard)}
+            title="चयनित वार्ड का एक्सेल/CSV डेटा डाउनलोड करें"
+          >
             <Download size={14} /> एक्सेल / CSV एक्सपोर्ट
           </button>
         </div>
@@ -106,6 +137,7 @@ export default function RegisterTable({
           <thead>
             <tr>
               <th className="sortable" onClick={() => onSortChange('sr_no')}>क्र.सं. ⬍</th>
+              <th>वार्ड</th>
               <th className="sortable" onClick={() => onSortChange('property_id')}>प्रॉपर्टी आईडी ⬍</th>
               <th className="sortable" onClick={() => onSortChange('house_no')}>हाउस नं. ⬍</th>
               <th className="sortable" onClick={() => onSortChange('owner_name')}>स्वामी का नाम ⬍</th>
@@ -140,6 +172,11 @@ export default function RegisterTable({
                 return (
                   <tr key={p._id || p.property_id}>
                     <td>{p.sr_no}</td>
+                    <td>
+                      <span className="badge-ward" style={{ fontSize: '0.73rem', padding: '2px 6px', fontWeight: 600 }}>
+                        {p.ward_no ? `वार्ड ${String(p.ward_no).padStart(2, '0')}` : 'वार्ड 01'}
+                      </span>
+                    </td>
                     <td><strong>{p.property_id}</strong></td>
                     <td>{p.house_no}</td>
                     <td>
@@ -158,7 +195,11 @@ export default function RegisterTable({
                     <td>{p.mobile}</td>
                     <td><span className={`badge-type badge-${typeClass}`}>{p.house_type}</span></td>
                     <td>{p.nirman}</td>
-                    <td>{p.road_width}</td>
+                    <td>
+                      <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                        {p.road_width ? (p.road_width.includes('To') ? p.road_width.replace('0 To 09', '0-9 मी.').replace('09 To 12', '9-12 मी.').replace('12 To 24', '12-24 मी.') : p.road_width) : '0-9 मी.'}
+                      </span>
+                    </td>
                     <td>{p.total_area}</td>
                     <td>{p.covered_area}</td>
                     <td>{p.business_area || 0}</td>
@@ -168,7 +209,15 @@ export default function RegisterTable({
                     <td>₹{p.res_tax || 0}</td>
                     <td>₹{p.com_tax || 0}</td>
                     <td>₹{p.plot_tax || 0}</td>
-                    <td><strong style={{ color: 'var(--success)' }}>₹{(p.total_tax || 0).toLocaleString('en-IN')}</strong></td>
+                    <td>
+                      <strong style={{ color: 'var(--success)' }}>₹{(p.total_tax || 0).toLocaleString('en-IN')}</strong>
+                      {(p.has_water_tax || p.has_sewer_tax) && (
+                        <div style={{ fontSize: '0.68rem', color: '#1d4ed8', fontWeight: 600 }}>
+                          {p.has_water_tax && '🚰 जल '}
+                          {p.has_sewer_tax && '🚽 सीवर'}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                       <button
                         className="btn btn-outline btn-sm"

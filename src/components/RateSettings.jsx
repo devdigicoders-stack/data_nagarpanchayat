@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw, Download, Users, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Settings, Save, RefreshCw, Download, Users, ShieldAlert, ShieldCheck, Building2 } from 'lucide-react';
 import UserManagementTab from './UserManagementTab';
+import WardManagementTab from './WardManagementTab';
 
 export default function RateSettings({ 
   settings, 
+  wards = [],
   onUpdateSettings, 
   onReSeed, 
   currentUser, 
   token, 
-  showToast 
+  showToast,
+  onWardsUpdated
 }) {
-  const [subTab, setSubTab] = useState('rates'); // 'rates' | 'users'
+  const [subTab, setSubTab] = useState('wards'); // 'wards' | 'rates' | 'users'
   const isAdmin = currentUser?.role === 'admin';
 
   const [form, setForm] = useState({
+    active_ward_no: 1,
     ward_name: 'वार्ड 01 - अध्यक्ष',
     palika_name: 'कार्यालय नगर पालिका परिषद / नगर पंचायत',
     financial_year: '2026-2027',
@@ -30,6 +34,7 @@ export default function RateSettings({
   useEffect(() => {
     if (settings) {
       setForm({
+        active_ward_no: settings.active_ward_no || 1,
         ward_name: settings.ward_name || 'वार्ड 01 - अध्यक्ष',
         palika_name: settings.palika_name || 'कार्यालय नगर पालिका परिषद / नगर पंचायत',
         financial_year: settings.financial_year || '2026-2027',
@@ -91,6 +96,15 @@ export default function RateSettings({
         <div className="settings-subtabs" style={{ display: 'flex', gap: 8 }}>
           <button
             type="button"
+            className={`btn btn-sm ${subTab === 'wards' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setSubTab('wards')}
+          >
+            <Building2 size={14} />
+            <span>वार्ड प्रबंधन (Wards) 🏛️</span>
+          </button>
+
+          <button
+            type="button"
             className={`btn btn-sm ${subTab === 'rates' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setSubTab('rates')}
           >
@@ -104,13 +118,20 @@ export default function RateSettings({
             onClick={() => setSubTab('users')}
           >
             <Users size={14} />
-            <span>कर्मचारी / यूजर प्रबंधन {isAdmin && '👑'}</span>
+            <span>कर्मचारी / यूजर {isAdmin && '👑'}</span>
           </button>
         </div>
       </div>
 
       <div className="card-body">
-        {subTab === 'users' ? (
+        {subTab === 'wards' ? (
+          <WardManagementTab
+            token={token}
+            currentUser={currentUser}
+            showToast={showToast}
+            onWardsUpdated={onWardsUpdated}
+          />
+        ) : subTab === 'users' ? (
           <UserManagementTab
             token={token}
             currentUser={currentUser}
@@ -142,14 +163,38 @@ export default function RateSettings({
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">वार्ड का नाम</label>
-                  <input
-                    type="text"
+                  <label className="form-label" style={{ fontWeight: 600 }}>
+                    <span>🏛️ सक्रिय कार्य वार्ड (Default Active Ward)</span>
+                    <span className="badge-auto">प्रविष्टि डिफ़ॉल्ट</span>
+                  </label>
+                  <select
                     className="form-control"
                     disabled={!isAdmin}
-                    value={form.ward_name}
-                    onChange={(e) => setForm({ ...form, ward_name: e.target.value })}
-                  />
+                    value={form.active_ward_no || 1}
+                    onChange={(e) => {
+                      const num = Number(e.target.value);
+                      const targetWard = (wards || []).find(w => w.ward_no === num);
+                      setForm({
+                        ...form,
+                        active_ward_no: num,
+                        ward_name: targetWard ? targetWard.ward_name : form.ward_name,
+                        id_prefix: targetWard?.id_prefix || form.id_prefix
+                      });
+                    }}
+                  >
+                    {wards && wards.length > 0 ? (
+                      wards.map(w => (
+                        <option key={w.ward_no} value={w.ward_no}>
+                          वार्ड {String(w.ward_no).padStart(2, '0')} — {w.ward_name} {w.property_count ? `(${w.property_count} संपत्तियां)` : ''}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="1">वार्ड 01 - अध्यक्ष</option>
+                    )}
+                  </select>
+                  <div className="form-note">
+                    यहाँ चुना गया वार्ड नए कर निर्धारण फॉर्म (Fast Entry) में स्वतः चयनित रहेगा, जिससे बार-बार वार्ड नहीं चुनना पड़ेगा।
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -254,6 +299,21 @@ export default function RateSettings({
                     value={form.id_prefix}
                     onChange={(e) => setForm({ ...form, id_prefix: e.target.value })}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">डिफ़ॉल्ट सड़क की चौड़ाई (Default Road Width)</label>
+                  <select
+                    className="form-control"
+                    disabled={!isAdmin}
+                    value={form.sticky_road_width || '0 से 9 मीटर'}
+                    onChange={(e) => setForm({ ...form, sticky_road_width: e.target.value })}
+                  >
+                    <option value="0 से 9 मीटर">0 से 9 मीटर (9 मीटर तक)</option>
+                    <option value="9 से 12 मीटर">9 से 12 मीटर</option>
+                    <option value="12 से 24 मीटर">12 से 24 मीटर</option>
+                    <option value="24 मीटर से अधिक">24 मीटर से अधिक</option>
+                  </select>
                 </div>
               </div>
 

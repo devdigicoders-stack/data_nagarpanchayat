@@ -26,6 +26,8 @@ export default function App() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Data States
+  const [wards, setWards] = useState([]);
+  const [selectedWard, setSelectedWard] = useState('all');
   const [stats, setStats] = useState(null);
   const [properties, setProperties] = useState([]);
   const [totalProps, setTotalProps] = useState(0);
@@ -136,9 +138,22 @@ export default function App() {
     }
   };
 
-  const loadNextIds = async () => {
+  const loadWards = async () => {
     try {
-      const res = await fetch('/api/next-id');
+      const res = await fetch('/api/wards');
+      const data = await res.json();
+      if (res.ok) {
+        setWards(data);
+      }
+    } catch (err) {
+      console.error('Failed to load wards', err);
+    }
+  };
+
+  const loadNextIds = async (wNo = selectedWard) => {
+    try {
+      const url = (wNo && wNo !== 'all') ? `/api/next-id?ward_no=${wNo}` : '/api/next-id';
+      const res = await fetch(url);
       const data = await res.json();
       setNextIds(data);
     } catch (err) {
@@ -146,9 +161,10 @@ export default function App() {
     }
   };
 
-  const loadStats = async () => {
+  const loadStats = async (wNo = selectedWard) => {
     try {
-      const res = await fetch('/api/stats');
+      const url = (wNo && wNo !== 'all') ? `/api/stats?ward_no=${wNo}` : '/api/stats';
+      const res = await fetch(url);
       const data = await res.json();
       setStats(data);
     } catch (err) {
@@ -164,6 +180,7 @@ export default function App() {
         search,
         house_type: houseType,
         nirman,
+        ward_no: selectedWard,
         sort_by: sortBy,
         sort_order: sortOrder
       });
@@ -179,13 +196,14 @@ export default function App() {
 
   useEffect(() => {
     loadSettings();
+    loadWards();
     loadNextIds();
-    loadStats();
   }, []);
 
   useEffect(() => {
     loadProperties();
-  }, [page, limit, search, houseType, nirman, sortBy, sortOrder]);
+    loadStats(selectedWard);
+  }, [page, limit, search, houseType, nirman, sortBy, sortOrder, selectedWard]);
 
   // Form Save
   const handleSaveProperty = async (formData) => {
@@ -222,19 +240,25 @@ export default function App() {
       }
 
       const saved = await res.json();
-      showToast(
-        editingRecord
-          ? `प्रॉपर्टी ${saved.property_id} सफलतापूर्वक अपडेट हुई!`
-          : `नई प्रॉपर्टी ${saved.property_id} सुरक्षित हो गई!`
-      );
 
+      const isEdit = Boolean(editingRecord);
       setEditingRecord(null);
       loadProperties();
-      loadStats();
-      loadNextIds();
-      setActiveTab('tabRegister');
+      loadStats(selectedWard);
+      const wardNo = saved.ward_no || formData.ward_no || 1;
+      loadNextIds(wardNo);
+
+      if (isEdit) {
+        showToast(`प्रॉपर्टी ${saved.property_id} सफलतापूर्वक अपडेट हुई!`);
+        setActiveTab('tabRegister');
+      } else {
+        showToast(`✅ नई प्रॉपर्टी (${saved.property_id} - ${saved.owner_name}) सुरक्षित हुई! अगला मकान दर्ज करें।`);
+        setActiveTab('tabEntry');
+      }
+      return saved;
     } catch (err) {
       showToast(err.message, 'error');
+      return null;
     }
   };
 
@@ -324,22 +348,27 @@ export default function App() {
     }
   };
 
-  // CSV Export
-  const handleExportCSV = async () => {
+  // CSV Export with Ward selection
+  const handleExportCSV = async (targetWardNo = selectedWard) => {
     try {
-      const res = await fetch('/api/properties?limit=all');
+      const wardToExport = (targetWardNo !== undefined && targetWardNo !== null) ? targetWardNo : selectedWard;
+      const exportUrl = (wardToExport && wardToExport !== 'all') 
+        ? `/api/properties?limit=all&ward_no=${wardToExport}` 
+        : '/api/properties?limit=all';
+      const res = await fetch(exportUrl);
       const data = await res.json();
       const allItems = data.items || [];
 
       const headers = [
-        'Sr.no.', 'Property Id', 'House No.', 'Owner Name', 'Husband/Father Name',
+        'Ward', 'Sr.no.', 'Property Id', 'House No.', 'Owner Name', 'Husband/Father Name',
         'Mobile Number', 'House Type', 'Nirman Ki Prakriti', 'Road Width',
         'Total Area', 'Covered Area', 'Business Area', 'Plot Area',
         'House Tax Rate', 'Plot Tax Rate', 'Total ARV', 'Res. Tax',
-        'Com. Tax', 'Plot Tax', 'Total House Tax'
+        'Com. Tax', 'Plot Tax', 'Water Tax (7.5%)', 'Sewer Tax (2.5%)', 'Total House Tax'
       ];
 
       const rows = allItems.map(p => [
+        `"${p.ward_name || `वार्ड ${p.ward_no || 1}`}"`,
         p.sr_no || '',
         p.property_id || '',
         p.house_no || '',
@@ -359,6 +388,8 @@ export default function App() {
         p.res_tax || 0,
         p.com_tax || 0,
         p.plot_tax || 0,
+        p.water_tax || 0,
+        p.sewer_tax || 0,
         p.total_tax || 0
       ]);
 
@@ -371,10 +402,11 @@ export default function App() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Ward_01_Adhyaksh_MongoDB_${new Date().toISOString().slice(0, 10)}.csv`;
+      const wardLabel = (wardToExport === 'all') ? 'All_Wards' : `Ward_${wardToExport}`;
+      a.download = `Palika_House_Tax_${wardLabel}_${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('एक्सेल / CSV फाइल डाउनलोड हो गई!');
+      showToast(`एक्सेल / CSV फाइल (${wardToExport === 'all' ? 'सभी वार्ड' : `वार्ड ${wardToExport}`}) डाउनलोड हो गई!`);
     } catch (err) {
       showToast('एक्सपोर्ट में त्रुटि', 'error');
     }
@@ -400,10 +432,21 @@ export default function App() {
     );
   }
 
+  const currentWardObj = wards.find(w => String(w.ward_no) === String(selectedWard));
+  const currentWardName = selectedWard === 'all'
+    ? 'सभी वार्ड'
+    : (currentWardObj?.ward_name || `वार्ड ${String(selectedWard).padStart(2, '0')}`);
+
   return (
     <div className="app-root-wrapper">
       <Header
-        wardName={settings?.ward_name || 'वार्ड 01 - अध्यक्ष'}
+        wardName={currentWardName}
+        wards={wards}
+        selectedWard={selectedWard}
+        onSelectWard={(wNo) => {
+          setSelectedWard(wNo);
+          setPage(1);
+        }}
         dbConnected={dbConnected}
         theme={theme}
         currentUser={currentUser}
@@ -433,7 +476,7 @@ export default function App() {
             className={`tab-btn ${activeTab === 'tabRegister' ? 'active' : ''}`}
             onClick={() => setActiveTab('tabRegister')}
           >
-            📋 संपत्ति रजिस्टर (Ward 1 Register)
+            📋 संपत्ति रजिस्टर ({selectedWard === 'all' ? 'सभी वार्ड' : `वार्ड ${selectedWard}`})
           </button>
           <button
             className={`tab-btn ${activeTab === 'tabEntry' ? 'active' : ''}`}
@@ -457,7 +500,7 @@ export default function App() {
             className={`tab-btn ${activeTab === 'tabSettings' ? 'active' : ''}`}
             onClick={() => setActiveTab('tabSettings')}
           >
-            ⚙️ दर एवं सेटिंग्स (Rate Master & Users)
+            ⚙️ दर, वार्ड एवं सेटिंग्स (Settings & Wards)
           </button>
         </div>
       </nav>
@@ -466,6 +509,7 @@ export default function App() {
         {activeTab === 'tabDashboard' && (
           <Dashboard
             stats={stats}
+            currentWardName={currentWardName}
             onOpenSlip={(prop) => setSelectedSlipProperty(prop)}
             onViewAll={() => setActiveTab('tabRegister')}
           />
@@ -502,6 +546,9 @@ export default function App() {
             onOwnerClick={handleOwnerClick}
             onExportCSV={handleExportCSV}
             currentUser={currentUser}
+            currentWardName={currentWardName}
+            wards={wards}
+            selectedWard={selectedWard}
           />
         )}
 
@@ -510,6 +557,7 @@ export default function App() {
             nextIds={nextIds}
             settings={settings}
             editingRecord={editingRecord}
+            wards={wards}
             onSave={handleSaveProperty}
             onCancel={() => {
               setEditingRecord(null);
@@ -528,11 +576,17 @@ export default function App() {
         {activeTab === 'tabSettings' && (
           <RateSettings
             settings={settings}
+            wards={wards}
             onUpdateSettings={handleUpdateSettings}
             onReSeed={handleReSeed}
             currentUser={currentUser}
             token={token}
             showToast={showToast}
+            onWardsUpdated={(updatedWards) => {
+              setWards(updatedWards);
+              loadStats(selectedWard);
+              loadProperties();
+            }}
           />
         )}
       </main>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Home, IndianRupee, TrendingUp, Building2, Printer, ArrowRight } from 'lucide-react';
 
-export default function Dashboard({ stats, onOpenSlip, onViewAll }) {
+export default function Dashboard({ stats, onOpenSlip, onViewAll, currentWardName = 'सभी वार्ड' }) {
   const {
     totalCount = 394,
     totalTax = 0,
@@ -42,7 +42,7 @@ export default function Dashboard({ stats, onOpenSlip, onViewAll }) {
               <span className="label-short">कुल संपत्तियां</span>
             </div>
             <div className="stat-value">{totalCount.toLocaleString('en-IN')}</div>
-            <div className="stat-sub">वार्ड 01 कुल सर्वे भवन</div>
+            <div className="stat-sub">{currentWardName} कुल सर्वे भवन</div>
           </div>
           <div className="stat-icon"><Home size={20} /></div>
         </div>
@@ -88,7 +88,7 @@ export default function Dashboard({ stats, onOpenSlip, onViewAll }) {
       <div className="content-card">
         <div className="card-header">
           <div>
-            <div className="card-title">📌 वार्ड 01 संपत्ति वर्गीकरण एवं कर विश्लेषण</div>
+            <div className="card-title">📌 {currentWardName} संपत्ति वर्गीकरण एवं कर विश्लेषण</div>
             <div className="card-desc">आवासीय, व्यावसायिक, मिश्रित एवं रिक्त भूखंडों का सारांश (MongoDB Data)</div>
           </div>
         </div>
