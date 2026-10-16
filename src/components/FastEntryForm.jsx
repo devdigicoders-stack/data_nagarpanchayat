@@ -41,6 +41,8 @@ export default function FastEntryForm({
     covered_length: '',
     covered_width: '',
     covered_area: 600,
+    business_length: '',
+    business_width: '',
     business_area: 0,
     plot_area: 0,
     house_tax_rate: 0.40,
@@ -76,6 +78,8 @@ export default function FastEntryForm({
         covered_length: editingRecord.covered_length || '',
         covered_width: editingRecord.covered_width || '',
         covered_area: Number(editingRecord.covered_area) || 0,
+        business_length: editingRecord.business_length || '',
+        business_width: editingRecord.business_width || '',
         business_area: Number(editingRecord.business_area) || 0,
         plot_area: Number(editingRecord.plot_area) || 0,
         house_tax_rate: Number(editingRecord.house_tax_rate) || 0.40,
@@ -113,6 +117,8 @@ export default function FastEntryForm({
         covered_length: '',
         covered_width: '',
         covered_area: 600,
+        business_length: '',
+        business_width: '',
         business_area: 0,
         plot_area: 0,
         house_tax_rate: getRateForNirman(settings?.sticky_nirman || 'Pakka', settings),
@@ -208,6 +214,20 @@ export default function FastEntryForm({
         next.covered_area = calcArea;
         const tot = Number(next.total_area) || 0;
         next.plot_area = Math.max(0, tot - calcArea);
+      }
+      return next;
+    });
+  };
+
+  // Business Area Dimension Handler (Length x Width)
+  const handleBusinessDimChange = (dim, val) => {
+    setFormData(prev => {
+      const next = { ...prev, [dim]: val };
+      const l = Number(dim === 'business_length' ? val : prev.business_length);
+      const w = Number(dim === 'business_width' ? val : prev.business_width);
+      if (l > 0 && w > 0) {
+        const calcArea = Math.round(l * w);
+        next.business_area = calcArea;
       }
       return next;
     });
@@ -359,6 +379,8 @@ export default function FastEntryForm({
       covered_length: Number(formData.covered_length) || 0,
       covered_width: Number(formData.covered_width) || 0,
       covered_area: coveredArea,
+      business_length: Number(formData.business_length) || 0,
+      business_width: Number(formData.business_width) || 0,
       business_area: businessArea,
       plot_area: plotArea,
       res_tax: resTax,
@@ -412,6 +434,8 @@ export default function FastEntryForm({
           total_width: '',
           covered_length: '',
           covered_width: '',
+          business_length: '',
+          business_width: '',
           business_area: 0
         }));
 
@@ -461,6 +485,8 @@ export default function FastEntryForm({
                   covered_length: '',
                   covered_width: '',
                   covered_area: 600,
+                  business_length: '',
+                  business_width: '',
                   business_area: 0,
                   plot_area: 0
                 }));
@@ -883,8 +909,45 @@ export default function FastEntryForm({
                 
                 {/* Shop / Commercial Portion */}
                 <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fde68a' }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 700 }}>
-                    🏪 दुकान / व्यावसायिक एरिया (Business Area) *
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 700, margin: 0 }}>
+                      🏪 दुकान / व्यावसायिक एरिया (Business Area) *
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>लंबाई × चौड़ाई</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.72rem' }}>लंबाई (फीट)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="उदा. 15"
+                        className="form-control"
+                        value={formData.business_length}
+                        onChange={(e) => handleBusinessDimChange('business_length', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.72rem' }}>चौड़ाई (फीट)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="उदा. 10"
+                        className="form-control"
+                        value={formData.business_width}
+                        onChange={(e) => handleBusinessDimChange('business_width', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <label className="form-label" style={{ fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>क्षेत्रफल (sq.ft.) *</span>
+                    {formData.business_length > 0 && formData.business_width > 0 && (
+                      <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e' }}>
+                        ✓ {formData.business_length} × {formData.business_width} = {businessArea}
+                      </span>
+                    )}
                   </label>
                   <div className="input-group">
                     <input
@@ -935,23 +998,67 @@ export default function FastEntryForm({
               </div>
             </div>
           ) : (
-            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <label className="form-label" style={{ fontSize: '0.8rem' }}>दुकान / बिजनेस एरिया (Business Area यदि कोई हो)</label>
-                <div className="input-group">
+            <div style={{ marginTop: '1.25rem', background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#b45309', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  🏪 दुकान / बिजनेस एरिया (Business Area यदि कोई हो)
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  लंबाई × चौड़ाई कैलकुलेटर
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>दुकान लंबाई (फीट)</label>
                   <input
                     type="number"
-                    className="form-control"
-                    min="0"
                     step="any"
-                    value={formData.business_area}
-                    onChange={(e) => handleChange('business_area', e.target.value)}
+                    placeholder="उदा. 15"
+                    className="form-control"
+                    value={formData.business_length}
+                    onChange={(e) => handleBusinessDimChange('business_length', e.target.value)}
                   />
-                  <span className="input-addon">वर्ग फुट</span>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>दुकान चौड़ाई (फीट)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="उदा. 10"
+                    className="form-control"
+                    value={formData.business_width}
+                    onChange={(e) => handleBusinessDimChange('business_width', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>दुकान क्षेत्रफल (वर्ग फुट)</span>
+                    {formData.business_length > 0 && formData.business_width > 0 && (
+                      <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e' }}>
+                        ✓ {formData.business_length} × {formData.business_width} = {businessArea}
+                      </span>
+                    )}
+                  </label>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="0"
+                      step="any"
+                      value={formData.business_area}
+                      onChange={(e) => handleChange('business_area', e.target.value)}
+                      style={{ fontWeight: 700, color: '#b45309' }}
+                    />
+                    <span className="input-addon">वर्ग फुट</span>
+                  </div>
                 </div>
               </div>
-              <div style={{ flex: 2, fontSize: '0.75rem', color: 'var(--text-secondary)', paddingTop: 18 }}>
-                यदि संपत्ति में दुकान व आवास दोनों हैं, तो ऊपर <strong>हाउस टाइप में "Mixed"</strong> चुनें।
+
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 8 }}>
+                💡 यदि संपत्ति में दुकान व आवास दोनों हैं, तो ऊपर <strong>हाउस टाइप में "Mixed"</strong> चुनें।
               </div>
             </div>
           )}

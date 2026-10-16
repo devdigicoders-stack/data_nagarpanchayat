@@ -34,6 +34,8 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
   const totWidth = Number(property.total_width) || 0;
   const covLength = Number(property.covered_length) || 0;
   const covWidth = Number(property.covered_width) || 0;
+  const busLength = Number(property.business_length) || 0;
+  const busWidth = Number(property.business_width) || 0;
 
   const words = numberToHindiWords(totalTax);
   const receiptNo = `HT/2026-27/${String(property.sr_no).padStart(4, '0')}`;
@@ -116,6 +118,7 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
               <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#475569' }}>
                 कुल प्लॉट: {totLength > 0 && totWidth > 0 ? `${totLength}′ × ${totWidth}′ = ` : ''}{totArea} sq.ft. | 
                 कवर्ड: {covLength > 0 && covWidth > 0 ? `${covLength}′ × ${covWidth}′ = ` : ''}{covArea} sq.ft.
+                {busArea > 0 ? ` | दुकान: ${busLength > 0 && busWidth > 0 ? `${busLength}′ × ${busWidth}′ = ` : ''}${busArea} sq.ft.` : ''}
               </span>
             </div>
 
