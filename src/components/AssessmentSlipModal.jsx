@@ -135,16 +135,16 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                   <td>आवासीय भाग (Residential)</td>
                   <td>{Math.max(0, covArea - busArea)} वर्ग फुट</td>
                   <td>₹{property.house_tax_rate || '0.40'}/माह</td>
-                  <td>₹{Math.round(resTax * 10).toLocaleString('en-IN')}</td>
-                  <td>10%</td>
+                  <td>₹{Math.round(resTax * (property.house_type?.toLowerCase() === 'government' ? 10/3 : 10)).toLocaleString('en-IN')}</td>
+                  <td>{property.house_type?.toLowerCase() === 'government' ? '30% (तीन गुना)' : '10%'}</td>
                   <td>₹{resTax.toLocaleString('en-IN')}</td>
                 </tr>
                 <tr>
                   <td>व्यावसायिक / दुकान भाग (Commercial)</td>
-                  <td>{busArea} वर्ग फुट</td>
+                  <td>{busArea || (property.house_type?.toLowerCase() === 'commercial' ? covArea : 0)} वर्ग फुट</td>
                   <td>₹{property.commercial_tax_rate || '1.00'}/माह</td>
-                  <td>₹{Math.round(comTax * 10).toLocaleString('en-IN')}</td>
-                  <td>10%</td>
+                  <td>₹{Math.round(comTax * 5).toLocaleString('en-IN')}</td>
+                  <td>20% (दोगुना)</td>
                   <td>₹{comTax.toLocaleString('en-IN')}</td>
                 </tr>
                 <tr>
@@ -156,11 +156,11 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                   <td>₹{plotTax.toLocaleString('en-IN')}</td>
                 </tr>
                 <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
-                  <td>मूल गृहकर योग (House Tax 10%)</td>
+                  <td>मूल गृहकर योग (House Tax)</td>
                   <td>{totArea} वर्ग फुट</td>
                   <td>(20% नियमानुसार छूट समायोजित)</td>
                   <td>₹{totalARV.toLocaleString('en-IN')}</td>
-                  <td>10%</td>
+                  <td>{property.house_type?.toLowerCase() === 'commercial' ? '20% (दोगुना)' : property.house_type?.toLowerCase() === 'government' ? '30% (तीन गुना)' : property.house_type?.toLowerCase() === 'mixed' ? 'मिश्रित दर' : '10%'}</td>
                   <td style={{ color: '#0369a1' }}>₹{houseTax.toLocaleString('en-IN')}</td>
                 </tr>
 

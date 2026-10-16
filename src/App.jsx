@@ -649,6 +649,9 @@ export default function App() {
               <span><strong>कुल मांग (Total Tax):</strong> ₹${sumTotalTax.toLocaleString('en-IN')}</span>
               <span><strong>दिनांक:</strong> ${currentDate}</span>
             </div>
+            <div style="font-size: 8.5px; color: #475569; margin-top: 3px; font-weight: 600; text-align: center;">
+              नियम: आवासीय गृहकर दर ARV का 10% • व्यावसायिक संपत्ति दर ARV का 20% (दोगुना - 2x) • सरकारी संपत्ति दर ARV का 30% (तीन गुना - 3x)
+            </div>
           </div>
 
           <table>

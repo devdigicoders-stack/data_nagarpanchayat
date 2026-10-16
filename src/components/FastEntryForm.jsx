@@ -266,10 +266,38 @@ export default function FastEntryForm({
   const netARV = resARV + comARV + plotARV;
   const discountAmt = Math.max(0, grossARV - netARV);
 
-  // House Tax (10%)
-  const resTax = Math.round(resARV * (taxPct / 100));
-  const comTax = Math.round(comARV * (taxPct / 100));
-  const plotTax = Math.round(plotARV * (taxPct / 100));
+  // House Tax calculation based on property type:
+  // Residential: 10% (1x)
+  // Commercial: 20% (दोगुना - 2x)
+  // Government: 30% (तीन गुना - 3x)
+  // Mixed: Residential 10% + Commercial 20%
+  const houseTypeLower = (formData.house_type || 'Residential').trim().toLowerCase();
+  
+  let resTax = 0;
+  let comTax = 0;
+  let plotTax = Math.round(plotARV * (taxPct / 100));
+  let taxRateNotice = '10%';
+
+  if (houseTypeLower === 'commercial') {
+    taxRateNotice = '20% (दोगुना - 2x)';
+    const commercialCoveredARV = resARV + comARV;
+    comTax = Math.round(commercialCoveredARV * ((taxPct * 2) / 100));
+    resTax = 0;
+  } else if (houseTypeLower === 'government') {
+    taxRateNotice = '30% (तीन गुना - 3x)';
+    const govtCoveredARV = resARV + comARV;
+    resTax = Math.round(govtCoveredARV * ((taxPct * 3) / 100));
+    comTax = 0;
+  } else if (houseTypeLower === 'mixed') {
+    taxRateNotice = 'आवास 10% + दुकान 20%';
+    resTax = Math.round(resARV * (taxPct / 100));
+    comTax = Math.round(comARV * ((taxPct * 2) / 100));
+  } else {
+    taxRateNotice = '10%';
+    resTax = Math.round(resARV * (taxPct / 100));
+    comTax = Math.round(comARV * (taxPct / 100));
+  }
+
   const houseTax = resTax + comTax + plotTax;
 
   // Water Tax (7.5%)
@@ -597,12 +625,27 @@ export default function FastEntryForm({
                 onChange={(e) => handleChange('house_type', e.target.value)}
                 required
               >
-                <option value="Residential">Residential (आवासीय - कोड 'R')</option>
-                <option value="Commercial">Commercial (व्यावसायिक - कोड 'C')</option>
-                <option value="Mixed">Mixed (मिश्रित: दुकान + आवास - कोड 'M')</option>
-                <option value="Plot">Plot (रिक्त भूखंड - कोड 'P')</option>
-                <option value="Government">Government (सरकारी / धार्मिक - कोड 'G')</option>
+                <option value="Residential">Residential (आवासीय - 10% कर दर)</option>
+                <option value="Commercial">Commercial (व्यावसायिक - 20% दोगुना कर दर)</option>
+                <option value="Mixed">Mixed (मिश्रित: दुकान + आवास - दुकान 20% कर दर)</option>
+                <option value="Plot">Plot (रिक्त भूखंड - 10% कर दर)</option>
+                <option value="Government">Government (सरकारी / संस्था - 30% तीन गुना कर दर)</option>
               </select>
+              {formData.house_type === 'Commercial' && (
+                <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600, marginTop: 4 }}>
+                  ⚡ व्यावसायिक संपत्ति: नियमानुसार गृहकर दर सामान्य से दोगुनी (20%) लागू होगी।
+                </div>
+              )}
+              {formData.house_type === 'Government' && (
+                <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600, marginTop: 4 }}>
+                  🏛️ सरकारी संपत्ति: नियमानुसार गृहकर दर सामान्य से तीन गुनी (30%) लागू होगी।
+                </div>
+              )}
+              {formData.house_type === 'Mixed' && (
+                <div style={{ fontSize: '0.75rem', color: '#7c3aed', fontWeight: 600, marginTop: 4 }}>
+                  🏪 मिश्रित संपत्ति: आवासीय भाग पर 10% एवं दुकान/व्यावसायिक भाग पर 20% लागू होगा।
+                </div>
+              )}
             </div>
 
             {/* Nirman Ki Prakriti (Sticky) */}
@@ -1096,7 +1139,7 @@ export default function FastEntryForm({
               </div>
 
               <div className="calc-step-card">
-                <div className="label">गृहकर (House Tax 10%)</div>
+                <div className="label">गृहकर (House Tax - {taxRateNotice})</div>
                 <div className="val">₹{houseTax.toLocaleString('en-IN')}</div>
               </div>
 
