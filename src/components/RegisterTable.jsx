@@ -26,13 +26,30 @@ export default function RegisterTable({
   currentUser = null,
   currentWardName = 'सभी वार्ड',
   wards = [],
-  selectedWard = 'all'
+  selectedWard = 'all',
+  onWardChange,
+  onResetFilters,
+  loading = false
 }) {
   const [exportWard, setExportWard] = React.useState(selectedWard || 'all');
 
   React.useEffect(() => {
     setExportWard(selectedWard || 'all');
   }, [selectedWard]);
+
+  const handleWardSelect = (wVal) => {
+    setExportWard(wVal);
+    if (onWardChange) {
+      onWardChange(wVal);
+    }
+  };
+
+  const hasActiveFilters = Boolean(
+    (search && search.trim()) ||
+    houseType ||
+    nirman ||
+    (selectedWard && selectedWard !== 'all')
+  );
 
   const startIdx = total === 0 ? 0 : (page - 1) * limit + 1;
   const endIdx = Math.min(page * limit, total);
@@ -50,9 +67,9 @@ export default function RegisterTable({
             <select
               className="form-control"
               style={{ width: 'auto', padding: '3px 6px', fontSize: '0.82rem', fontWeight: 600, border: 'none', background: 'transparent', cursor: 'pointer' }}
-              value={exportWard}
-              onChange={(e) => setExportWard(e.target.value)}
-              title="एक्सपोर्ट करने हेतु वार्ड चुनें"
+              value={selectedWard}
+              onChange={(e) => handleWardSelect(e.target.value)}
+              title="वार्ड चुनें (डेटा फ़िल्टर एवं एक्सपोर्ट हेतु)"
             >
               <option value="all">📊 सभी वार्ड (संपूर्ण निकाय)</option>
               {wards && wards.map(w => (
@@ -66,7 +83,7 @@ export default function RegisterTable({
           <button 
             className="btn btn-success btn-sm" 
             onClick={() => onExportCSV(exportWard)}
-            title="चयनित वार्ड का एक्सेल/CSV डेटा डाउनलोड करें"
+            title="चयनित वार्ड/फ़िल्टर का एक्सेल/CSV डेटा डाउनलोड करें"
           >
             <Download size={14} /> एक्सेल / CSV एक्सपोर्ट
           </button>
@@ -87,7 +104,22 @@ export default function RegisterTable({
             />
           </div>
 
-          <div className="filters-group">
+          <div className="filters-group" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <select
+              className="form-control"
+              style={{ width: 'auto', fontWeight: 600 }}
+              value={selectedWard}
+              onChange={(e) => handleWardSelect(e.target.value)}
+              title="वार्ड अनुसार फ़िल्टर करें"
+            >
+              <option value="all">📍 सभी वार्ड (All Wards)</option>
+              {wards && wards.map(w => (
+                <option key={w.ward_no} value={w.ward_no}>
+                  वार्ड {String(w.ward_no).padStart(2, '0')} - {w.ward_name.replace(/^वार्ड\s*\d+\s*[-–]?\s*/i, '')} {w.property_count ? `(${w.property_count})` : ''}
+                </option>
+              ))}
+            </select>
+
             <select
               className="form-control"
               style={{ width: 'auto' }}
@@ -127,6 +159,20 @@ export default function RegisterTable({
               <option value="100">100 प्रति पेज</option>
               <option value="all">सभी</option>
             </select>
+
+            {hasActiveFilters && (
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => {
+                  if (onResetFilters) onResetFilters();
+                  if (onWardChange) onWardChange('all');
+                }}
+                title="सभी फ़िल्टर हटाएं"
+                style={{ color: 'var(--danger)', borderColor: 'var(--border-color)', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', fontWeight: 600 }}
+              >
+                ✕ फ़िल्टर हटाएं
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -160,10 +206,32 @@ export default function RegisterTable({
             </tr>
           </thead>
           <tbody>
-            {properties.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan="20" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-                  कोई रिकॉर्ड नहीं मिला।
+                <td colSpan="21" style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary)' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: '0.95rem', fontWeight: 600 }}>
+                    <span style={{ display: 'inline-block', width: 18, height: 18, border: '2.5px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    डेटा फ़िल्टर हो रहा है...
+                  </div>
+                </td>
+              </tr>
+            ) : properties.length === 0 ? (
+              <tr>
+                <td colSpan="21" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: 6 }}>कोई रिकॉर्ड नहीं मिला</div>
+                  <div style={{ fontSize: '0.85rem' }}>चयनित फ़िल्टर के अनुसार कोई संपत्ति डेटा उपलब्ध नहीं है।</div>
+                  {hasActiveFilters && (
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => {
+                        if (onResetFilters) onResetFilters();
+                        if (onWardChange) onWardChange('all');
+                      }}
+                      style={{ marginTop: 12 }}
+                    >
+                      सभी फ़िल्टर हटाएं (Reset)
+                    </button>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -173,7 +241,12 @@ export default function RegisterTable({
                   <tr key={p._id || p.property_id}>
                     <td>{p.sr_no}</td>
                     <td>
-                      <span className="badge-ward" style={{ fontSize: '0.73rem', padding: '2px 6px', fontWeight: 600 }}>
+                      <span 
+                        className="badge-ward" 
+                        style={{ fontSize: '0.73rem', padding: '2px 6px', fontWeight: 600, cursor: 'pointer' }}
+                        onClick={() => handleWardSelect(p.ward_no)}
+                        title={`वार्ड ${p.ward_no} अनुसार फ़िल्टर करें`}
+                      >
                         {p.ward_no ? `वार्ड ${String(p.ward_no).padStart(2, '0')}` : 'वार्ड 01'}
                       </span>
                     </td>

@@ -35,10 +35,12 @@ export default function App() {
   const [limit, setLimit] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [houseType, setHouseType] = useState('');
   const [nirman, setNirman] = useState('');
   const [sortBy, setSortBy] = useState('sr_no');
   const [sortOrder, setSortOrder] = useState('asc');
+  const [loadingProperties, setLoadingProperties] = useState(false);
 
   const [nextIds, setNextIds] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -172,12 +174,22 @@ export default function App() {
     }
   };
 
+  // Debounce search input to avoid race conditions and erratic API calls
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [search]);
+
   const loadProperties = async () => {
+    setLoadingProperties(true);
     try {
       const queryParams = new URLSearchParams({
         page,
         limit,
-        search,
+        search: debouncedSearch,
         house_type: houseType,
         nirman,
         ward_no: selectedWard,
@@ -185,12 +197,16 @@ export default function App() {
         sort_order: sortOrder
       });
       const res = await fetch(`/api/properties?${queryParams.toString()}`);
-      const data = await res.json();
-      setProperties(data.items || []);
-      setTotalProps(data.total || 0);
-      setTotalPages(data.totalPages || 1);
+      if (res.ok) {
+        const data = await res.json();
+        setProperties(data.items || []);
+        setTotalProps(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+      }
     } catch (err) {
       console.error('Failed to load properties', err);
+    } finally {
+      setLoadingProperties(false);
     }
   };
 
@@ -203,7 +219,7 @@ export default function App() {
   useEffect(() => {
     loadProperties();
     loadStats(selectedWard);
-  }, [page, limit, search, houseType, nirman, sortBy, sortOrder, selectedWard]);
+  }, [page, limit, debouncedSearch, houseType, nirman, sortBy, sortOrder, selectedWard]);
 
   // Form Save
   const handleSaveProperty = async (formData) => {
@@ -348,14 +364,18 @@ export default function App() {
     }
   };
 
-  // CSV Export with Ward selection
+  // CSV Export with Ward & active filter selection
   const handleExportCSV = async (targetWardNo = selectedWard) => {
     try {
       const wardToExport = (targetWardNo !== undefined && targetWardNo !== null) ? targetWardNo : selectedWard;
-      const exportUrl = (wardToExport && wardToExport !== 'all') 
-        ? `/api/properties?limit=all&ward_no=${wardToExport}` 
-        : '/api/properties?limit=all';
-      const res = await fetch(exportUrl);
+      const exportParams = new URLSearchParams({
+        limit: 'all',
+        ...(wardToExport && wardToExport !== 'all' ? { ward_no: wardToExport } : {}),
+        ...(houseType ? { house_type: houseType } : {}),
+        ...(nirman ? { nirman } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {})
+      });
+      const res = await fetch(`/api/properties?${exportParams.toString()}`);
       const data = await res.json();
       const allItems = data.items || [];
 
@@ -527,7 +547,7 @@ export default function App() {
             nirman={nirman}
             sortBy={sortBy}
             sortOrder={sortOrder}
-            onSearchChange={(v) => { setSearch(v); setPage(1); }}
+            onSearchChange={(v) => setSearch(v)}
             onHouseTypeChange={(v) => { setHouseType(v); setPage(1); }}
             onNirmanChange={(v) => { setNirman(v); setPage(1); }}
             onPageSizeChange={(v) => { setLimit(v === 'all' ? 10000 : Number(v)); setPage(1); }}
@@ -549,6 +569,18 @@ export default function App() {
             currentWardName={currentWardName}
             wards={wards}
             selectedWard={selectedWard}
+            onWardChange={(wNo) => {
+              setSelectedWard(wNo);
+              setPage(1);
+            }}
+            onResetFilters={() => {
+              setSearch('');
+              setHouseType('');
+              setNirman('');
+              setSelectedWard('all');
+              setPage(1);
+            }}
+            loading={loadingProperties}
           />
         )}
 
