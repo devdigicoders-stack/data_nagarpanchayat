@@ -117,7 +117,11 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
               <span>📐 संपत्ति क्षेत्रफल माप एवं मूल्यांकन विवरण:</span>
               <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#475569' }}>
                 कुल प्लॉट: {totLength > 0 && totWidth > 0 ? `${totLength}′ × ${totWidth}′ = ` : ''}{totArea} sq.ft. | 
-                कवर्ड: {covLength > 0 && covWidth > 0 ? `${covLength}′ × ${covWidth}′ = ` : ''}{covArea} sq.ft.
+                {property.floors_data && property.floors_data.length > 1 ? (
+                  <>मंजिल: {property.floors_data.length} मंजिलें ({property.floors_data.map(f => `${f.name?.split(' ')?.[0] || 'तल'}: ${f.area}`).join(' + ')}) | कुल कवर्ड: {covArea} sq.ft.</>
+                ) : (
+                  <>कवर्ड: {covLength > 0 && covWidth > 0 ? `${covLength}′ × ${covWidth}′ = ` : ''}{covArea} sq.ft.</>
+                )}
                 {busArea > 0 ? ` | दुकान: ${busLength > 0 && busWidth > 0 ? `${busLength}′ × ${busWidth}′ = ` : ''}${busArea} sq.ft.` : ''}
               </span>
             </div>
@@ -136,7 +140,7 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
               <tbody>
                 <tr>
                   <td>आवासीय भाग (Residential)</td>
-                  <td>{Math.max(0, covArea - busArea)} वर्ग फुट</td>
+                  <td>{Math.max(0, covArea - busArea)} sq.ft. (80% कर योग्य: {Math.round(Math.max(0, covArea - busArea) * 0.8)} sq.ft.)</td>
                   <td>₹{property.house_tax_rate || '0.40'}/माह</td>
                   <td>₹{Math.round(resTax * (property.house_type?.toLowerCase() === 'government' ? 10/3 : 10)).toLocaleString('en-IN')}</td>
                   <td>{property.house_type?.toLowerCase() === 'government' ? '30% (तीन गुना)' : '10%'}</td>
@@ -144,7 +148,7 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                 </tr>
                 <tr>
                   <td>व्यावसायिक / दुकान भाग (Commercial)</td>
-                  <td>{busArea || (property.house_type?.toLowerCase() === 'commercial' ? covArea : 0)} वर्ग फुट</td>
+                  <td>{busArea || (property.house_type?.toLowerCase() === 'commercial' ? covArea : 0)} sq.ft. (80% कर योग्य: {Math.round((busArea || (property.house_type?.toLowerCase() === 'commercial' ? covArea : 0)) * 0.8)} sq.ft.)</td>
                   <td>₹{property.commercial_tax_rate || '1.00'}/माह</td>
                   <td>₹{Math.round(comTax * 5).toLocaleString('en-IN')}</td>
                   <td>20% (दोगुना)</td>
@@ -161,7 +165,7 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                 <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
                   <td>मूल गृहकर योग (House Tax)</td>
                   <td>{totArea} वर्ग फुट</td>
-                  <td>(20% नियमानुसार छूट समायोजित)</td>
+                  <td>(कवर्ड एरिया के 80% भाग पर कर निर्धारण)</td>
                   <td>₹{totalARV.toLocaleString('en-IN')}</td>
                   <td>{property.house_type?.toLowerCase() === 'commercial' ? '20% (दोगुना)' : property.house_type?.toLowerCase() === 'government' ? '30% (तीन गुना)' : property.house_type?.toLowerCase() === 'mixed' ? 'मिश्रित दर' : '10%'}</td>
                   <td style={{ color: '#0369a1' }}>₹{houseTax.toLocaleString('en-IN')}</td>

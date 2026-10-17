@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RotateCcw, Zap, ArrowRightCircle, PlusCircle, CheckCircle2 } from 'lucide-react';
+import { Save, RotateCcw, Zap, ArrowRightCircle, PlusCircle, CheckCircle2, Building2, Layers } from 'lucide-react';
 
 export default function FastEntryForm({ 
   nextIds, 
@@ -41,6 +41,10 @@ export default function FastEntryForm({
     covered_length: '',
     covered_width: '',
     covered_area: 600,
+    floors_count: 1,
+    floors: [
+      { id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: 600 }
+    ],
     business_length: '',
     business_width: '',
     business_area: 0,
@@ -78,6 +82,16 @@ export default function FastEntryForm({
         covered_length: editingRecord.covered_length || '',
         covered_width: editingRecord.covered_width || '',
         covered_area: Number(editingRecord.covered_area) || 0,
+        floors_count: Number(editingRecord.floors_count) || (editingRecord.floors_data?.length || 1),
+        floors: editingRecord.floors_data && editingRecord.floors_data.length > 0
+          ? editingRecord.floors_data.map((f, i) => ({
+              id: f.id || (i + 1),
+              name: f.name || f.floor_name || (i === 0 ? 'भूतल (Ground Floor)' : `${i + 1}वीं मंजिल`),
+              length: f.length || '',
+              width: f.width || '',
+              area: Number(f.area) || 0
+            }))
+          : [{ id: 1, name: 'भूतल (Ground Floor)', length: editingRecord.covered_length || '', width: editingRecord.covered_width || '', area: Number(editingRecord.covered_area) || 0 }],
         business_length: editingRecord.business_length || '',
         business_width: editingRecord.business_width || '',
         business_area: Number(editingRecord.business_area) || 0,
@@ -117,6 +131,8 @@ export default function FastEntryForm({
         covered_length: '',
         covered_width: '',
         covered_area: 600,
+        floors_count: 1,
+        floors: [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: 600 }],
         business_length: '',
         business_width: '',
         business_area: 0,
@@ -160,16 +176,32 @@ export default function FastEntryForm({
 
       if (field === 'total_area') {
         const tot = Math.max(0, Number(value) || 0);
-        if (!prev.covered_area || prev.covered_area === prev.total_area) {
-          next.covered_area = tot;
+        if (prev.house_type === 'Plot') {
+          next.covered_area = 0;
+          next.business_area = 0;
+          next.plot_area = tot;
+        } else {
+          if (!prev.covered_area || prev.covered_area === prev.total_area) {
+            next.covered_area = tot;
+            if (next.floors && next.floors.length === 1) {
+              next.floors = [{ ...next.floors[0], area: tot }];
+            }
+          }
+          const gfArea = Number(next.floors?.[0]?.area) || tot;
+          next.plot_area = Math.max(0, tot - gfArea);
         }
-        next.plot_area = Math.max(0, tot - (Number(next.covered_area) || 0));
       }
 
       if (field === 'covered_area') {
         const tot = Math.max(0, Number(prev.total_area) || 0);
         const cov = Math.max(0, Number(value) || 0);
-        next.plot_area = Math.max(0, tot - cov);
+        const currentFloors = prev.floors && prev.floors.length > 0 ? prev.floors.map(f => ({ ...f })) : [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: cov }];
+        if (currentFloors.length === 1) {
+          currentFloors[0] = { ...currentFloors[0], area: cov };
+        }
+        const gfArea = Number(currentFloors[0]?.area) || cov;
+        next.floors = currentFloors;
+        next.plot_area = Math.max(0, tot - gfArea);
       }
 
       if (field === 'house_type') {
@@ -178,6 +210,28 @@ export default function FastEntryForm({
           next.property_id = prev.property_id.slice(0, -1) + suffix;
         } else {
           next.property_id = prev.property_id + suffix;
+        }
+
+        if (value === 'Plot') {
+          next.nirman = 'Plot';
+          next.covered_area = 0;
+          next.covered_length = '';
+          next.covered_width = '';
+          next.business_area = 0;
+          next.business_length = '';
+          next.business_width = '';
+          next.plot_area = Number(next.total_area) || 0;
+          next.floors_count = 0;
+          next.floors = [];
+        } else if (prev.house_type === 'Plot' && value !== 'Plot') {
+          if (next.nirman === 'Plot') {
+            next.nirman = 'Pakka';
+          }
+          const tot = Number(next.total_area) || 0;
+          next.covered_area = tot;
+          next.plot_area = 0;
+          next.floors_count = 1;
+          next.floors = [{ id: 1, name: 'भूतल (Ground Floor)', length: next.total_length || '', width: next.total_width || '', area: tot }];
         }
       }
 
@@ -194,29 +248,186 @@ export default function FastEntryForm({
       if (l > 0 && w > 0) {
         const calcArea = Math.round(l * w);
         next.total_area = calcArea;
-        if (!prev.covered_area || prev.covered_area === prev.total_area) {
-          next.covered_area = calcArea;
+        if (prev.house_type === 'Plot') {
+          next.covered_area = 0;
+          next.business_area = 0;
+          next.plot_area = calcArea;
+        } else {
+          if (!prev.covered_area || prev.covered_area === prev.total_area) {
+            next.covered_area = calcArea;
+            if (next.floors && next.floors.length === 1) {
+              next.floors = [{ ...next.floors[0], area: calcArea }];
+            }
+          }
+          const gfArea = Number(next.floors?.[0]?.area) || (Number(next.covered_area) || 0);
+          next.plot_area = Math.max(0, calcArea - gfArea);
         }
-        next.plot_area = Math.max(0, calcArea - (Number(next.covered_area) || 0));
       }
       return next;
     });
   };
 
-  // Covered Area Dimension Handler (Length x Width)
-  const handleCoveredDimChange = (dim, val) => {
+  // Floor templates for multi-story buildings (मंजिल)
+  const floorNameTemplates = [
+    'भूतल (Ground Floor)',
+    'प्रथम तल (1st Floor)',
+    'द्वितीय तल (2nd Floor)',
+    'तृतीय तल (3rd Floor)',
+    'चतुर्थ तल (4th Floor)',
+    'पंचम तल (5th Floor)'
+  ];
+
+  const handleSetFloorCount = (count) => {
+    const targetCount = Math.max(1, count);
     setFormData(prev => {
-      const next = { ...prev, [dim]: val };
-      const l = Number(dim === 'covered_length' ? val : prev.covered_length);
-      const w = Number(dim === 'covered_width' ? val : prev.covered_width);
-      if (l > 0 && w > 0) {
-        const calcArea = Math.round(l * w);
-        next.covered_area = calcArea;
-        const tot = Number(next.total_area) || 0;
-        next.plot_area = Math.max(0, tot - calcArea);
+      const currentFloors = prev.floors && prev.floors.length > 0
+        ? prev.floors.map(f => ({ ...f }))
+        : [{ id: 1, name: 'भूतल (Ground Floor)', length: prev.covered_length || '', width: prev.covered_width || '', area: Number(prev.covered_area) || 0 }];
+
+      const gf = currentFloors[0] || { id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: Number(prev.covered_area) || 0 };
+      let updated = [];
+
+      if (targetCount <= currentFloors.length) {
+        updated = currentFloors.slice(0, targetCount);
+      } else {
+        updated = [...currentFloors];
+        for (let i = currentFloors.length; i < targetCount; i++) {
+          const nextId = i + 1;
+          const nextName = floorNameTemplates[i] || `${nextId}वीं मंजिल`;
+          updated.push({
+            id: nextId,
+            name: nextName,
+            length: gf.length || '',
+            width: gf.width || '',
+            area: Number(gf.area) || 0
+          });
+        }
       }
+
+      const newCoveredArea = updated.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
+      const gfArea = Number(updated[0]?.area) || 0;
+      const totArea = Number(prev.total_area) || 0;
+
+      return {
+        ...prev,
+        floors_count: targetCount,
+        floors: updated,
+        covered_area: newCoveredArea,
+        plot_area: Math.max(0, totArea - gfArea)
+      };
+    });
+  };
+
+  const handleAddFloor = () => {
+    setFormData(prev => {
+      const currentFloors = prev.floors && prev.floors.length > 0
+        ? prev.floors.map(f => ({ ...f }))
+        : [{ id: 1, name: 'भूतल (Ground Floor)', length: prev.covered_length || '', width: prev.covered_width || '', area: Number(prev.covered_area) || 0 }];
+      const nextId = currentFloors.length + 1;
+      const nextName = floorNameTemplates[currentFloors.length] || `${nextId}वीं मंजिल`;
+      const gf = currentFloors[0] || {};
+
+      const newFloor = {
+        id: nextId,
+        name: nextName,
+        length: gf.length || '',
+        width: gf.width || '',
+        area: Number(gf.area) || 0
+      };
+
+      const updated = [...currentFloors, newFloor];
+      const newCoveredArea = updated.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
+      const gfArea = Number(updated[0]?.area) || 0;
+      const totArea = Number(prev.total_area) || 0;
+
+      return {
+        ...prev,
+        floors_count: updated.length,
+        floors: updated,
+        covered_area: newCoveredArea,
+        plot_area: Math.max(0, totArea - gfArea)
+      };
+    });
+  };
+
+  const handleRemoveFloor = (index) => {
+    if (index === 0) return; // Cannot delete ground floor
+    setFormData(prev => {
+      const currentFloors = (prev.floors || []).map(f => ({ ...f }));
+      const updated = currentFloors.filter((_, i) => i !== index);
+      const newCoveredArea = updated.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
+      const gfArea = Number(updated[0]?.area) || 0;
+      const totArea = Number(prev.total_area) || 0;
+
+      return {
+        ...prev,
+        floors_count: updated.length,
+        floors: updated,
+        covered_area: newCoveredArea,
+        plot_area: Math.max(0, totArea - gfArea)
+      };
+    });
+  };
+
+  const handleFloorChange = (index, field, val) => {
+    setFormData(prev => {
+      const currentFloors = prev.floors && prev.floors.length > 0 
+        ? prev.floors.map(f => ({ ...f })) 
+        : [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: 0 }];
+      const target = { ...currentFloors[index], [field]: val };
+
+      if (field === 'length' || field === 'width') {
+        const l = Number(field === 'length' ? val : target.length);
+        const w = Number(field === 'width' ? val : target.width);
+        if (l > 0 && w > 0) {
+          target.area = Math.round(l * w);
+        }
+      }
+
+      currentFloors[index] = target;
+      const newCoveredArea = currentFloors.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
+      const gfArea = Number(currentFloors[0]?.area) || 0;
+      const totArea = Number(prev.total_area) || 0;
+
+      const next = {
+        ...prev,
+        floors: currentFloors,
+        covered_area: newCoveredArea,
+        plot_area: Math.max(0, totArea - gfArea)
+      };
+
+      if (index === 0) {
+        if (field === 'length') next.covered_length = val;
+        if (field === 'width') next.covered_width = val;
+      }
+
       return next;
     });
+  };
+
+  const handleCopyGfToFloor = (index) => {
+    setFormData(prev => {
+      const currentFloors = (prev.floors || []).map(f => ({ ...f }));
+      const gf = currentFloors[0];
+      if (!gf || !currentFloors[index]) return prev;
+      currentFloors[index] = {
+        ...currentFloors[index],
+        length: gf.length,
+        width: gf.width,
+        area: gf.area
+      };
+      const newCoveredArea = currentFloors.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
+      return {
+        ...prev,
+        floors: currentFloors,
+        covered_area: newCoveredArea
+      };
+    });
+  };
+
+  // Covered Area Dimension Handler (Length x Width) - delegates to ground floor
+  const handleCoveredDimChange = (dim, val) => {
+    handleFloorChange(0, dim === 'covered_length' ? 'length' : 'width', val);
   };
 
   // Business Area Dimension Handler (Length x Width)
@@ -252,18 +463,27 @@ export default function FastEntryForm({
   const handle80Percent = () => {
     const tot = Math.max(0, Number(formData.total_area) || 0);
     const cov = Math.round(tot * 0.8);
-    setFormData(prev => ({
-      ...prev,
-      covered_area: cov,
-      plot_area: Math.max(0, tot - cov)
-    }));
+    setFormData(prev => {
+      const currentFloors = prev.floors && prev.floors.length > 0 
+        ? prev.floors.map((f, i) => i === 0 ? { ...f, area: cov } : { ...f }) 
+        : [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: cov }];
+      const newCoveredArea = currentFloors.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
+      return {
+        ...prev,
+        floors: currentFloors,
+        covered_area: newCoveredArea,
+        plot_area: Math.max(0, tot - cov)
+      };
+    });
   };
 
   // Live Calculations
+  const isPlot = (formData.house_type || '').trim().toLowerCase() === 'plot';
   const totalArea = Math.max(0, Number(formData.total_area) || 0);
-  const coveredArea = Math.max(0, Number(formData.covered_area) || 0);
-  const businessArea = Math.max(0, Number(formData.business_area) || 0);
-  const plotArea = Math.max(0, Number(formData.plot_area) || 0);
+  const coveredArea = isPlot ? 0 : Math.max(0, Number(formData.covered_area) || 0);
+  const businessArea = isPlot ? 0 : Math.max(0, Number(formData.business_area) || 0);
+  const plotArea = isPlot ? totalArea : Math.max(0, Number(formData.plot_area) || 0);
+  const groundFloorArea = isPlot ? 0 : (Number(formData.floors?.[0]?.area) || coveredArea);
 
   const houseRate = Number(formData.house_tax_rate) || 0.40;
   const plotRate = Number(formData.plot_tax_rate) || 0.10;
@@ -271,26 +491,33 @@ export default function FastEntryForm({
   const discountPct = Number(formData.discount_percent ?? 20);
   const taxPct = Number(formData.tax_percent ?? 10);
 
-  const discountMultiplier = Math.max(0, 1 - (discountPct / 100));
+  const discountMultiplier = Math.max(0, 1 - (discountPct / 100)); // Statutory 80% taxable base multiplier
   const resArea = Math.max(0, coveredArea - businessArea);
 
-  const resMonthly = resArea * houseRate;
-  const comMonthly = businessArea * comRate;
-  const plotMonthly = plotArea * plotRate;
-  const grossMonthly = resMonthly + comMonthly + plotMonthly;
+  // 80% Rule on Covered Area / Plot Area:
+  // Tax is assessed on 80% of taxable area
+  const taxableResArea = Math.round(resArea * discountMultiplier);
+  const taxableBusinessArea = Math.round(businessArea * discountMultiplier);
+  const taxablePlotArea = Math.round(plotArea * discountMultiplier);
+
+  const resMonthly = taxableResArea * houseRate;
+  const comMonthly = taxableBusinessArea * comRate;
+  const plotMonthly = taxablePlotArea * plotRate;
+  const grossMonthly = isPlot ? plotMonthly : (resMonthly + comMonthly + plotMonthly);
   const grossARV = Math.round(grossMonthly * 12);
 
-  const resARV = Math.round(resArea * discountMultiplier * houseRate * 12);
-  const comARV = Math.round(businessArea * discountMultiplier * comRate * 12);
-  const plotARV = Math.round(plotArea * discountMultiplier * plotRate * 12);
-  const netARV = resARV + comARV + plotARV;
-  const discountAmt = Math.max(0, grossARV - netARV);
+  const resARV = isPlot ? 0 : Math.round(taxableResArea * houseRate * 12);
+  const comARV = isPlot ? 0 : Math.round(taxableBusinessArea * comRate * 12);
+  const plotARV = Math.round(taxablePlotArea * plotRate * 12);
+  const netARV = isPlot ? plotARV : (resARV + comARV + plotARV);
+  const discountAmt = Math.max(0, ((resArea * houseRate + businessArea * comRate + plotArea * plotRate) * 12) - netARV);
 
   // House Tax calculation based on property type:
   // Residential: 10% (1x)
   // Commercial: 20% (दोगुना - 2x)
   // Government: 30% (तीन गुना - 3x)
   // Mixed: Residential 10% + Commercial 20%
+  // Plot: 10% (प्लॉट टैक्स)
   const houseTypeLower = (formData.house_type || 'Residential').trim().toLowerCase();
   
   let resTax = 0;
@@ -298,7 +525,12 @@ export default function FastEntryForm({
   let plotTax = Math.round(plotARV * (taxPct / 100));
   let taxRateNotice = '10%';
 
-  if (houseTypeLower === 'commercial') {
+  if (houseTypeLower === 'plot') {
+    taxRateNotice = '10% (प्लॉट टैक्स)';
+    resTax = 0;
+    comTax = 0;
+    plotTax = Math.round(plotARV * (taxPct / 100));
+  } else if (houseTypeLower === 'commercial') {
     taxRateNotice = '20% (दोगुना - 2x)';
     const commercialCoveredARV = resARV + comARV;
     comTax = Math.round(commercialCoveredARV * ((taxPct * 2) / 100));
@@ -318,7 +550,7 @@ export default function FastEntryForm({
     comTax = Math.round(comARV * (taxPct / 100));
   }
 
-  const houseTax = resTax + comTax + plotTax;
+  const houseTax = isPlot ? plotTax : (resTax + comTax + plotTax);
 
   // Water Tax (7.5%)
   const hasWaterTax = Boolean(formData.has_water_tax);
@@ -371,18 +603,33 @@ export default function FastEntryForm({
     setIsSubmitting(true);
     localStorage.setItem('sticky_active_ward_no', String(formData.ward_no));
 
+    const isPlotSubmission = formData.house_type === 'Plot';
+    const effectiveCoveredArea = isPlotSubmission ? 0 : coveredArea;
+    const effectiveBusinessArea = isPlotSubmission ? 0 : businessArea;
+    const effectivePlotArea = isPlotSubmission ? totalArea : plotArea;
+
+    const floorsList = isPlotSubmission
+      ? []
+      : (formData.floors && formData.floors.length > 0
+          ? formData.floors
+          : [{ id: 1, name: 'भूतल (Ground Floor)', length: formData.covered_length || '', width: formData.covered_width || '', area: coveredArea }]);
+
     const submissionData = {
       ...formData,
+      nirman: isPlotSubmission ? 'Plot' : formData.nirman,
       total_length: Number(formData.total_length) || 0,
       total_width: Number(formData.total_width) || 0,
       total_area: totalArea,
-      covered_length: Number(formData.covered_length) || 0,
-      covered_width: Number(formData.covered_width) || 0,
-      covered_area: coveredArea,
-      business_length: Number(formData.business_length) || 0,
-      business_width: Number(formData.business_width) || 0,
-      business_area: businessArea,
-      plot_area: plotArea,
+      covered_length: isPlotSubmission ? 0 : (Number(floorsList[0]?.length || formData.covered_length) || 0),
+      covered_width: isPlotSubmission ? 0 : (Number(floorsList[0]?.width || formData.covered_width) || 0),
+      covered_area: effectiveCoveredArea,
+      floors_count: isPlotSubmission ? 0 : floorsList.length,
+      floors_data: floorsList,
+      business_length: isPlotSubmission ? 0 : (Number(formData.business_length) || 0),
+      business_width: isPlotSubmission ? 0 : (Number(formData.business_width) || 0),
+      business_area: effectiveBusinessArea,
+      plot_area: effectivePlotArea,
+      total_arv: netARV,
       res_tax: resTax,
       com_tax: comTax,
       plot_tax: plotTax,
@@ -432,11 +679,16 @@ export default function FastEntryForm({
           mobile: '',
           total_length: '',
           total_width: '',
+          total_area: '',
           covered_length: '',
           covered_width: '',
+          covered_area: '',
           business_length: '',
           business_width: '',
-          business_area: 0
+          business_area: 0,
+          plot_area: '',
+          floors_count: prev.house_type === 'Plot' ? 0 : 1,
+          floors: prev.house_type === 'Plot' ? [] : [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: 0 }]
         }));
 
         // Focus owner name for lightning-fast next entry
@@ -672,6 +924,11 @@ export default function FastEntryForm({
                   🏪 मिश्रित संपत्ति: आवासीय भाग पर 10% एवं दुकान/व्यावसायिक भाग पर 20% लागू होगा।
                 </div>
               )}
+              {formData.house_type === 'Plot' && (
+                <div style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600, marginTop: 4 }}>
+                  🌱 रिक्त भूखंड (Plot): इसमें केवल कुल क्षेत्रफल भरना होगा, कवर्ड व खुला क्षेत्र आवश्यक नहीं है।
+                </div>
+              )}
             </div>
 
             {/* Nirman Ki Prakriti (Sticky) */}
@@ -724,20 +981,29 @@ export default function FastEntryForm({
           <div style={{ marginTop: '1.5rem', background: 'var(--bg-subtle)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: 8 }}>
               <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                📐 क्षेत्रफल विवरण एवं स्वतः कैलकुलेटर (Length × Width Calculator)
+                📐 {isPlot ? 'प्लॉट क्षेत्रफल विवरण (Plot Area Calculator)' : 'क्षेत्रफल विवरण एवं स्वतः कैलकुलेटर (Length × Width Calculator)'}
               </h3>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                लंबाई व चौड़ाई डालने पर कुल क्षेत्रफल स्वतः निकल जाता है
+                {isPlot 
+                  ? 'रिक्त भूखंड के लिए केवल कुल क्षेत्रफल दर्ज करें' 
+                  : 'लंबाई व चौड़ाई डालने पर कुल क्षेत्रफल स्वतः निकल जाता है'}
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isPlot ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
               
               {/* Total Area Box */}
               <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--primary)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-                  <span>1. कुल क्षेत्रफल (Total Area)</span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>लंबाई × चौड़ाई</span>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--primary)', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{isPlot ? '1. कुल प्लॉट क्षेत्रफल (Total Plot Area)' : '1. कुल क्षेत्रफल (Total Area)'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {isPlot && (
+                      <span className="badge-auto" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '0.72rem', fontWeight: 700 }}>
+                        🌱 केवल प्लॉट मोड (कोड: 'P')
+                      </span>
+                    )}
+                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>लंबाई × चौड़ाई</span>
+                  </div>
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
@@ -767,7 +1033,7 @@ export default function FastEntryForm({
 
                 <div>
                   <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>कुल क्षेत्रफल (वर्ग फुट) *</span>
+                    <span>{isPlot ? 'कुल प्लॉट क्षेत्रफल (वर्ग फुट) *' : 'कुल क्षेत्रफल (वर्ग फुट) *'}</span>
                     {formData.total_length > 0 && formData.total_width > 0 && (
                       <span className="badge-auto" style={{ background: '#e0f2fe', color: '#0369a1' }}>
                         ✓ {formData.total_length} × {formData.total_width} = {totalArea}
@@ -788,279 +1054,449 @@ export default function FastEntryForm({
                     <span className="input-addon">वर्ग फुट</span>
                   </div>
                 </div>
+
+                {isPlot && (
+                  <div style={{ fontSize: '0.76rem', color: '#0369a1', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '10px 12px', borderRadius: 'var(--radius-sm)', marginTop: 12 }}>
+                    💡 <strong>प्लॉट कर नियम:</strong> रिक्त भूखंड होने पर कवर्ड क्षेत्र 0 रहता है। कुल <strong>{totalArea} वर्ग फुट</strong> के 80% भाग (<strong>{taxablePlotArea} sq.ft.</strong>) पर ₹{plotRate}/sqft की दर से स्वतः प्लॉट टैक्स (10%) की गणना होगी।
+                  </div>
+                )}
               </div>
 
-              {/* Covered Area Box */}
-              <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#059669', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>2. कवर्ड एरिया (Covered Area)</span>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-xs"
-                    onClick={handle80Percent}
-                    style={{ padding: '2px 6px', fontSize: '0.72rem', borderColor: '#10b981', color: '#059669' }}
-                    title="कुल क्षेत्रफल का 80% कवर्ड सेट करें"
-                  >
-                    ⚡ 80% भरें
-                  </button>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>कवर्ड लंबाई (फीट)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="उदा. 24"
-                      className="form-control"
-                      value={formData.covered_length}
-                      onChange={(e) => handleCoveredDimChange('covered_length', e.target.value)}
-                    />
+              {/* Covered Area Box - Only when NOT Plot */}
+              {!isPlot && (
+                <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#059669', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Building2 size={16} />
+                      <span>2. कवर्ड एरिया (Covered Area)</span>
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-xs"
+                        onClick={handle80Percent}
+                        style={{ padding: '2px 8px', fontSize: '0.72rem', borderColor: '#10b981', color: '#059669' }}
+                        title="कुल क्षेत्रफल का 80% कवर्ड सेट करें"
+                      >
+                        ⚡ 80% भरें
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-xs"
+                        onClick={handleAddFloor}
+                        style={{ padding: '2px 8px', fontSize: '0.72rem', borderColor: '#0284c7', color: '#0284c7', background: '#f0f9ff' }}
+                        title="एक और मंजिल जोड़ें"
+                      >
+                        + मंजिल जोड़ें
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.75rem' }}>कवर्ड चौड़ाई (फीट)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="उदा. 20"
-                      className="form-control"
-                      value={formData.covered_width}
-                      onChange={(e) => handleCoveredDimChange('covered_width', e.target.value)}
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>कवर्ड क्षेत्रफल (वर्ग फुट) *</span>
-                    {formData.covered_length > 0 && formData.covered_width > 0 && (
-                      <span className="badge-auto" style={{ background: '#dcfce7', color: '#15803d' }}>
-                        ✓ {formData.covered_length} × {formData.covered_width} = {coveredArea}
+                  {/* Floor Count Buttons Bar */}
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '6px 10px', 
+                    background: '#f8fafc', 
+                    borderRadius: 'var(--radius-sm)', 
+                    marginBottom: 12, 
+                    border: '1px solid #e2e8f0',
+                    flexWrap: 'wrap',
+                    gap: 6
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Layers size={13} />
+                        <span>मंजिलों की संख्या:</span>
+                      </span>
+                      <div style={{ display: 'inline-flex', borderRadius: 4, overflow: 'hidden', border: '1px solid #cbd5e1' }}>
+                        {[1, 2, 3, 4].map(num => {
+                          const active = (formData.floors?.length || 1) === num;
+                          return (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => handleSetFloorCount(num)}
+                              style={{
+                                padding: '2px 9px',
+                                fontSize: '0.72rem',
+                                fontWeight: active ? 700 : 500,
+                                background: active ? '#059669' : '#fff',
+                                color: active ? '#fff' : '#334155',
+                                border: 'none',
+                                cursor: 'pointer',
+                                borderRight: num < 4 ? '1px solid #cbd5e1' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {num === 1 ? '1 मंजिल' : `${num} मंजिल`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {(formData.floors?.length || 1) > 1 && (
+                      <span className="badge-auto" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '0.72rem' }}>
+                        बहुमंजिला ({formData.floors.length} मंजिलें)
                       </span>
                     )}
-                  </label>
-                  <div className="input-group">
-                    <input
-                      type="number"
-                      className="form-control"
-                      min="0"
-                      step="any"
-                      value={formData.covered_area}
-                      onChange={(e) => handleChange('covered_area', e.target.value)}
-                      required
-                      style={{ fontWeight: 700, fontSize: '1rem', color: '#059669' }}
-                    />
-                    <span className="input-addon">वर्ग फुट</span>
+                  </div>
+
+                  {/* Floor List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {(formData.floors || [{ id: 1, name: 'भूतल (Ground Floor)', length: formData.covered_length || '', width: formData.covered_width || '', area: coveredArea }]).map((floor, idx) => (
+                      <div 
+                        key={floor.id || idx}
+                        style={{ 
+                          background: idx === 0 ? 'var(--bg-subtle, #f8fafc)' : '#f0fdf4', 
+                          padding: '10px', 
+                          borderRadius: 'var(--radius-sm)', 
+                          border: idx === 0 ? '1px solid #e2e8f0' : '1px solid #bbf7d0' 
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: idx === 0 ? '#1e293b' : '#15803d', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span>🏢</span>
+                            <span>{floor.name || `${idx + 1}वीं मंजिल`}</span>
+                          </span>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {idx > 0 && (
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-xs"
+                                onClick={() => handleCopyGfToFloor(idx)}
+                                style={{ padding: '1px 6px', fontSize: '0.68rem', borderColor: '#10b981', color: '#059669', background: '#fff' }}
+                                title="भूतल की लंबाई व चौड़ाई कॉपी करें"
+                              >
+                                ⚡ भूतल के समान
+                              </button>
+                            )}
+                            {idx > 0 && (
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-xs"
+                                onClick={() => handleRemoveFloor(idx)}
+                                style={{ padding: '1px 6px', fontSize: '0.68rem', borderColor: '#ef4444', color: '#dc2626', background: '#fff' }}
+                                title="यह मंजिल हटाएं"
+                              >
+                                ✕ हटाएं
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                          <div>
+                            <label className="form-label" style={{ fontSize: '0.72rem' }}>लंबाई (फीट)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder={idx === 0 ? "उदा. 24" : "लंबाई"}
+                              className="form-control"
+                              style={{ height: '32px', fontSize: '0.85rem' }}
+                              value={floor.length || ''}
+                              onChange={(e) => handleFloorChange(idx, 'length', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="form-label" style={{ fontSize: '0.72rem' }}>चौड़ाई (फीट)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder={idx === 0 ? "उदा. 20" : "चौड़ाई"}
+                              className="form-control"
+                              style={{ height: '32px', fontSize: '0.85rem' }}
+                              value={floor.width || ''}
+                              onChange={(e) => handleFloorChange(idx, 'width', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>
+                              {idx === 0 ? 'भूतल क्षेत्रफल (वर्ग फुट)' : `${floor.name} क्षेत्रफल (वर्ग फुट)`}
+                            </span>
+                            {floor.length > 0 && floor.width > 0 && (
+                              <span style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: 600 }}>
+                                ✓ {floor.length} × {floor.width} = {floor.area} sq.ft.
+                              </span>
+                            )}
+                          </div>
+                          <div className="input-group">
+                            <input
+                              type="number"
+                              className="form-control"
+                              min="0"
+                              step="any"
+                              value={floor.area ?? ''}
+                              onChange={(e) => handleFloorChange(idx, 'area', e.target.value)}
+                              required
+                              style={{ fontWeight: 700, fontSize: '0.95rem', color: '#059669', height: '34px' }}
+                            />
+                            <span className="input-addon" style={{ fontSize: '0.75rem', padding: '0 8px' }}>वर्ग फुट</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total Covered Area Banner */}
+                  <div style={{ 
+                    marginTop: 10, 
+                    padding: '8px 12px', 
+                    background: '#f0fdf4', 
+                    borderRadius: 'var(--radius-sm)', 
+                    border: '1.5px solid #86efac' 
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534' }}>
+                        {formData.floors && formData.floors.length > 1 
+                          ? `🏢 कुल कवर्ड क्षेत्रफल (${formData.floors.length} मंजिलों का योग):` 
+                          : 'कुल कवर्ड क्षेत्रफल:'}
+                      </span>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#059669' }}>
+                        {coveredArea} वर्ग फुट
+                      </span>
+                    </div>
+                    {formData.floors && formData.floors.length > 1 && (
+                      <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: 4 }}>
+                        जोड़: {formData.floors.map((f, i) => `${f.name.split(' ')[0]}: ${f.area || 0}`).join(' + ')} = <strong>{coveredArea} sq.ft.</strong>
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.73rem', color: '#059669', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
+                      <span>🏛️ 80% कर योग्य नियम: <strong>{taxableResArea + taxableBusinessArea} sq.ft.</strong> पर टैक्स लागू</span>
+                      <span>(20% नियमानुसार छूट)</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Plot Area / Open Ground Box */}
-              <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#d97706', marginBottom: 8 }}>
-                  3. खुला / प्लॉट एरिया (Open Area)
-                </div>
+              {/* Plot Area / Open Ground Box - Only when NOT Plot */}
+              {!isPlot && (
+                <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#d97706', marginBottom: 8 }}>
+                    3. खुला / प्लॉट एरिया (Open Area)
+                  </div>
 
-                <div style={{ marginBottom: 12 }}>
-                  <label className="form-label" style={{ fontSize: '0.78rem' }}>रिक्त प्लॉट क्षेत्रफल (वर्ग फुट)</label>
-                  <div className="input-group">
-                    <input
-                      type="number"
-                      className="form-control"
-                      min="0"
-                      step="any"
-                      value={formData.plot_area}
-                      onChange={(e) => handleChange('plot_area', e.target.value)}
-                      style={{ fontWeight: 600 }}
-                    />
-                    <span className="input-addon">वर्ग फुट</span>
+                  <div style={{ marginBottom: 12 }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem' }}>रिक्त प्लॉट क्षेत्रफल (वर्ग फुट)</label>
+                    <div className="input-group">
+                      <input
+                        type="number"
+                        className="form-control"
+                        min="0"
+                        step="any"
+                        value={formData.plot_area}
+                        onChange={(e) => handleChange('plot_area', e.target.value)}
+                        style={{ fontWeight: 600 }}
+                      />
+                      <span className="input-addon">वर्ग फुट</span>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', background: 'var(--bg-subtle)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
+                    {formData.floors && formData.floors.length > 1 ? (
+                      <>💡 <strong>स्वतः सूत्र:</strong> {totalArea} कुल प्लॉट - {groundFloorArea} भूतल = <strong>{plotArea} वर्ग फुट</strong> खुला प्लॉट (बहुमंजिला)</>
+                    ) : (
+                      <>💡 <strong>स्वतः सूत्र:</strong> {totalArea} कुल - {coveredArea} कवर्ड = <strong>{plotArea} वर्ग फुट</strong> खुला प्लॉट</>
+                    )}
                   </div>
                 </div>
-
-                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', background: 'var(--bg-subtle)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
-                  💡 <strong>स्वतः सूत्र:</strong> {totalArea} कुल - {coveredArea} कवर्ड = <strong>{plotArea} वर्ग फुट</strong> खुला प्लॉट
-                </div>
-              </div>
+              )}
 
             </div>
           </div>
 
-          {/* Mixed Property Breakdown (दुकान + रिहायशी आवास + खुला प्लॉट) */}
-          {formData.house_type === 'Mixed' ? (
-            <div style={{ marginTop: '1.25rem', padding: '16px', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(59, 130, 246, 0.08))', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '1.3rem' }}>🏪</span>
-                  <div>
-                    <strong style={{ fontSize: '0.95rem', color: '#b45309' }}>
-                      मिक्स प्रॉपर्टी (Mixed Property) - दुकान + आवास विभाजन
-                    </strong>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      दुकान (व्यावसायिक) और रिहायशी आवास का अलग-अलग क्षेत्रफल और टैक्स गणना:
+          {/* Mixed Property Breakdown or Shop Calculator (Hidden for Plot) */}
+          {!isPlot && (
+            formData.house_type === 'Mixed' ? (
+              <div style={{ marginTop: '1.25rem', padding: '16px', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(59, 130, 246, 0.08))', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '1.3rem' }}>🏪</span>
+                    <div>
+                      <strong style={{ fontSize: '0.95rem', color: '#b45309' }}>
+                        मिक्स प्रॉपर्टी (Mixed Property) - दुकान + आवास विभाजन
+                      </strong>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        दुकान (व्यावसायिक) और रिहायशी आवास का अलग-अलग क्षेत्रफल और टैक्स गणना:
+                      </div>
                     </div>
                   </div>
+                  <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
+                    मिक्स मोड सक्रिय (कोड: 'M')
+                  </span>
                 </div>
-                <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
-                  मिक्स मोड सक्रिय (कोड: 'M')
-                </span>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-                
-                {/* Shop / Commercial Portion */}
-                <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fde68a' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <label className="form-label" style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 700, margin: 0 }}>
-                      🏪 दुकान / व्यावसायिक एरिया (Business Area) *
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                  
+                  {/* Shop / Commercial Portion */}
+                  <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fde68a' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <label className="form-label" style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 700, margin: 0 }}>
+                        🏪 दुकान / व्यावसायिक एरिया (Business Area) *
+                      </label>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>लंबाई × चौड़ाई</span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.72rem' }}>लंबाई (फीट)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="उदा. 15"
+                          className="form-control"
+                          value={formData.business_length}
+                          onChange={(e) => handleBusinessDimChange('business_length', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.72rem' }}>चौड़ाई (फीट)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="उदा. 10"
+                          className="form-control"
+                          value={formData.business_width}
+                          onChange={(e) => handleBusinessDimChange('business_width', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <label className="form-label" style={{ fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>क्षेत्रफल (sq.ft.) *</span>
+                      {formData.business_length > 0 && formData.business_width > 0 && (
+                        <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e' }}>
+                          ✓ {formData.business_length} × {formData.business_width} = {businessArea}
+                        </span>
+                      )}
                     </label>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>लंबाई × चौड़ाई</span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.72rem' }}>लंबाई (फीट)</label>
+                    <div className="input-group">
                       <input
                         type="number"
-                        step="any"
-                        placeholder="उदा. 15"
                         className="form-control"
-                        value={formData.business_length}
-                        onChange={(e) => handleBusinessDimChange('business_length', e.target.value)}
+                        min="0"
+                        max={coveredArea}
+                        step="any"
+                        placeholder="दुकान का क्षेत्रफल"
+                        value={formData.business_area}
+                        onChange={(e) => handleChange('business_area', e.target.value)}
+                        required
+                        style={{ fontWeight: 700, color: '#b45309', fontSize: '1rem' }}
                       />
+                      <span className="input-addon">sq.ft.</span>
                     </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.72rem' }}>चौड़ाई (फीट)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="उदा. 10"
-                        className="form-control"
-                        value={formData.business_width}
-                        onChange={(e) => handleBusinessDimChange('business_width', e.target.value)}
-                      />
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                      {businessArea > 0 ? (
+                        <>कवर्ड {businessArea} sq.ft. का 80% = <strong>{taxableBusinessArea} sq.ft. कर योग्य</strong> • दर: ₹{comRate}/sqft • टैक्स: <strong>₹{comTax}</strong></>
+                      ) : (
+                        <>दर: ₹{comRate}/sqft • टैक्स: <strong>₹{comTax}</strong></>
+                      )}
                     </div>
                   </div>
 
-                  <label className="form-label" style={{ fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>क्षेत्रफल (sq.ft.) *</span>
-                    {formData.business_length > 0 && formData.business_width > 0 && (
-                      <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e' }}>
-                        ✓ {formData.business_length} × {formData.business_width} = {businessArea}
+                  {/* Residential Portion (Auto-Calculated) */}
+                  <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>🏠 रिहायशी आवास भाग</span>
+                      <span style={{ fontSize: '0.72rem', color: '#2563eb' }}>80% कर योग्य</span>
+                    </label>
+                    <div style={{ padding: '8px 10px', background: '#eff6ff', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 800, fontSize: '1.15rem', color: '#1e3a8a' }}>
+                        {taxableResArea} वर्ग फुट
                       </span>
-                    )}
-                  </label>
-                  <div className="input-group">
+                      <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 600 }}>
+                        (कुल कवर्ड {resArea} sq.ft. का 80%)
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: 5, lineHeight: 1.4 }}>
+                      स्वतः: कवर्ड {resArea} sq.ft. का 80% = <strong>{taxableResArea} sq.ft.</strong> • दर: ₹{houseRate}/sqft • मासिक: ₹{resMonthly.toFixed(1)} • टैक्स: <strong style={{ color: '#1e40af' }}>₹{resTax}</strong>
+                    </div>
+                  </div>
+
+                  {/* Plot Portion */}
+                  <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fed7aa' }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', color: '#c2410c', fontWeight: 700 }}>
+                      🌱 रिक्त प्लॉट भाग (Plot Area)
+                    </label>
+                    <div style={{ padding: '8px 10px', background: '#fff7ed', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '1.05rem', color: '#c2410c' }}>
+                      {plotArea} वर्ग फुट
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                      दर: ₹{plotRate}/sqft • टैक्स: <strong>₹{plotTax}</strong>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginTop: '1.25rem', background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#b45309', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    🏪 दुकान / बिजनेस एरिया (Business Area यदि कोई हो)
+                  </span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                    लंबाई × चौड़ाई कैलकुलेटर
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>दुकान लंबाई (फीट)</label>
                     <input
                       type="number"
-                      className="form-control"
-                      min="0"
-                      max={coveredArea}
                       step="any"
-                      placeholder="दुकान का क्षेत्रफल"
-                      value={formData.business_area}
-                      onChange={(e) => handleChange('business_area', e.target.value)}
-                      required
-                      style={{ fontWeight: 700, color: '#b45309', fontSize: '1rem' }}
+                      placeholder="उदा. 15"
+                      className="form-control"
+                      value={formData.business_length}
+                      onChange={(e) => handleBusinessDimChange('business_length', e.target.value)}
                     />
-                    <span className="input-addon">sq.ft.</span>
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                    दर: ₹{comRate}/sqft • टैक्स: <strong>₹{comTax}</strong>
-                  </div>
-                </div>
 
-                {/* Residential Portion (Auto-Calculated) */}
-                <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 700 }}>
-                    🏠 रिहायशी आवास भाग (Residential Area)
-                  </label>
-                  <div style={{ padding: '8px 10px', background: '#eff6ff', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '1.05rem', color: '#1e3a8a' }}>
-                    {resArea} वर्ग फुट
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                    स्वतः ({coveredArea} कवर्ड - {businessArea} दुकान) • दर: ₹{houseRate}/sqft • टैक्स: <strong>₹{resTax}</strong>
-                  </div>
-                </div>
-
-                {/* Plot Portion */}
-                <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #fed7aa' }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#c2410c', fontWeight: 700 }}>
-                    🌱 रिक्त प्लॉट भाग (Plot Area)
-                  </label>
-                  <div style={{ padding: '8px 10px', background: '#fff7ed', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '1.05rem', color: '#c2410c' }}>
-                    {plotArea} वर्ग फुट
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                    दर: ₹{plotRate}/sqft • टैक्स: <strong>₹{plotTax}</strong>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          ) : (
-            <div style={{ marginTop: '1.25rem', background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#b45309', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  🏪 दुकान / बिजनेस एरिया (Business Area यदि कोई हो)
-                </span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  लंबाई × चौड़ाई कैलकुलेटर
-                </span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>दुकान लंबाई (फीट)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="उदा. 15"
-                    className="form-control"
-                    value={formData.business_length}
-                    onChange={(e) => handleBusinessDimChange('business_length', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>दुकान चौड़ाई (फीट)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="उदा. 10"
-                    className="form-control"
-                    value={formData.business_width}
-                    onChange={(e) => handleBusinessDimChange('business_width', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>दुकान क्षेत्रफल (वर्ग फुट)</span>
-                    {formData.business_length > 0 && formData.business_width > 0 && (
-                      <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e' }}>
-                        ✓ {formData.business_length} × {formData.business_width} = {businessArea}
-                      </span>
-                    )}
-                  </label>
-                  <div className="input-group">
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.75rem' }}>दुकान चौड़ाई (फीट)</label>
                     <input
                       type="number"
-                      className="form-control"
-                      min="0"
                       step="any"
-                      value={formData.business_area}
-                      onChange={(e) => handleChange('business_area', e.target.value)}
-                      style={{ fontWeight: 700, color: '#b45309' }}
+                      placeholder="उदा. 10"
+                      className="form-control"
+                      value={formData.business_width}
+                      onChange={(e) => handleBusinessDimChange('business_width', e.target.value)}
                     />
-                    <span className="input-addon">वर्ग फुट</span>
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>दुकान क्षेत्रफल (वर्ग फुट)</span>
+                      {formData.business_length > 0 && formData.business_width > 0 && (
+                        <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e' }}>
+                          ✓ {formData.business_length} × {formData.business_width} = {businessArea}
+                        </span>
+                      )}
+                    </label>
+                    <div className="input-group">
+                      <input
+                        type="number"
+                        className="form-control"
+                        min="0"
+                        step="any"
+                        value={formData.business_area}
+                        onChange={(e) => handleChange('business_area', e.target.value)}
+                        style={{ fontWeight: 700, color: '#b45309' }}
+                      />
+                      <span className="input-addon">वर्ग फुट</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 8 }}>
-                💡 यदि संपत्ति में दुकान व आवास दोनों हैं, तो ऊपर <strong>हाउस टाइप में "Mixed"</strong> चुनें।
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 8 }}>
+                  💡 यदि संपत्ति में दुकान व आवास दोनों हैं, तो ऊपर <strong>हाउस टाइप में "Mixed"</strong> चुनें।
+                </div>
               </div>
-            </div>
+            )
           )}
 
           {/* Water & Sewer Tax Options (जल टैक्स 7.5% एवं सीवर टैक्स 2.5%) */}
@@ -1225,36 +1661,82 @@ export default function FastEntryForm({
               </span>
             </div>
             <div className="calc-steps-grid">
-              <div className="calc-step-card">
-                <div className="label">मासिक किराया मूल्य (Monthly Base)</div>
-                <div className="val">₹{grossMonthly.toLocaleString('en-IN', { maximumFractionDigits: 1 })}</div>
-              </div>
+              {isPlot ? (
+                <>
+                  <div className="calc-step-card" style={{ background: '#f0f9ff', borderColor: '#bae6fd' }}>
+                    <div className="label" style={{ color: '#0369a1' }}>🌱 कर योग्य प्लॉट भाग (80%)</div>
+                    <div className="val" style={{ color: '#0284c7' }}>{taxablePlotArea} sq.ft.</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      कुल प्लॉट: {totalArea} sq.ft. (20% छूट)
+                    </div>
+                  </div>
 
-              <div className="calc-step-card">
-                <div className="label">12 महीने का कुल (Gross ARV)</div>
-                <div className="val">₹{grossARV.toLocaleString('en-IN')}</div>
-              </div>
+                  <div className="calc-step-card">
+                    <div className="label">मासिक आधार किराया (@ ₹{plotRate})</div>
+                    <div className="val">₹{plotMonthly.toLocaleString('en-IN', { maximumFractionDigits: 1 })}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      {taxablePlotArea} sq.ft. × ₹{plotRate}/sqft
+                    </div>
+                  </div>
 
-              <div className="calc-step-card">
-                <div className="label">लागू छूट राशि ({discountPct}%)</div>
-                <div className="val" style={{ color: 'var(--danger)' }}>- ₹{discountAmt.toLocaleString('en-IN')}</div>
-              </div>
+                  <div className="calc-step-card">
+                    <div className="label">वार्षिक शुद्ध मूल्यांकन (Annual ARV)</div>
+                    <div className="val" style={{ color: 'var(--primary)' }}>₹{netARV.toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      12 महीने का वार्षिक मूल्य
+                    </div>
+                  </div>
 
-              <div className="calc-step-card">
-                <div className="label">शुद्ध मूल्यांकन (Net ARV)</div>
-                <div className="val" style={{ color: 'var(--primary)' }}>₹{netARV.toLocaleString('en-IN')}</div>
-              </div>
+                  <div className="calc-step-card">
+                    <div className="label">प्लॉट टैक्स (Plot Tax - 10%)</div>
+                    <div className="val" style={{ color: '#059669' }}>₹{plotTax.toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      ARV का 10% (कोड: 'P')
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="calc-step-card">
+                    <div className="label">कर योग्य कवर्ड भाग (80%)</div>
+                    <div className="val" style={{ color: '#059669' }}>{taxableResArea + taxableBusinessArea} sq.ft.</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      कुल कवर्ड: {coveredArea} sq.ft.
+                    </div>
+                  </div>
 
-              <div className="calc-step-card">
-                <div className="label">गृहकर (House Tax - {taxRateNotice})</div>
-                <div className="val">₹{houseTax.toLocaleString('en-IN')}</div>
-              </div>
+                  <div className="calc-step-card">
+                    <div className="label">मासिक आधार किराया (Monthly Base)</div>
+                    <div className="val">₹{grossMonthly.toLocaleString('en-IN', { maximumFractionDigits: 1 })}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      80% कर योग्य एरिया × दर
+                    </div>
+                  </div>
+
+                  <div className="calc-step-card">
+                    <div className="label">वार्षिक शुद्ध मूल्यांकन (Annual ARV)</div>
+                    <div className="val" style={{ color: 'var(--primary)' }}>₹{netARV.toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      12 महीने का वार्षिक मूल्य
+                    </div>
+                  </div>
+
+                  <div className="calc-step-card">
+                    <div className="label">गृहकर (House Tax - {taxRateNotice})</div>
+                    <div className="val">₹{houseTax.toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      ARV पर लागू कर
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Water Tax Step Card (Shown only if checked) */}
               {hasWaterTax && (
                 <div className="calc-step-card" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
                   <div className="label" style={{ color: '#1d4ed8' }}>🚰 जलकर (Water 7.5%)</div>
                   <div className="val" style={{ color: '#1d4ed8' }}>₹{waterTax.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#1d4ed8', marginTop: 2 }}>ARV का 7.5%</div>
                 </div>
               )}
 
@@ -1263,6 +1745,7 @@ export default function FastEntryForm({
                 <div className="calc-step-card" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
                   <div className="label" style={{ color: '#15803d' }}>🚽 सीवर कर (Sewer 2.5%)</div>
                   <div className="val" style={{ color: '#15803d' }}>₹{sewerTax.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#15803d', marginTop: 2 }}>ARV का 2.5%</div>
                 </div>
               )}
 
@@ -1271,6 +1754,7 @@ export default function FastEntryForm({
                   कुल वार्षिक कर मांग {hasWaterTax || hasSewerTax ? '(गृहकर + अतिरिक्त कर)' : '(Annual House Tax)'}
                 </div>
                 <div className="val">₹{finalTax.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '0.7rem', color: '#15803d', marginTop: 2 }}>वार्षिक देय राशि</div>
               </div>
             </div>
           </div>
