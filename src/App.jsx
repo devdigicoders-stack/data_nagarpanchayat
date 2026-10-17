@@ -380,15 +380,14 @@ export default function App() {
       const allItems = data.items || [];
 
       const headers = [
-        'Ward', 'Sr.no.', 'Property Id', 'House No.', 'Owner Name', 'Husband/Father Name',
+        'Sr.no.', 'Property Id', 'House No.', 'Owner Name', 'Husband/Father Name',
         'Mobile Number', 'House Type', 'Nirman Ki Prakriti', 'Road Width',
         'Total Area', 'Covered Area', 'Business Area', 'Plot Area',
         'House Tax Rate', 'Plot Tax Rate', 'Total ARV', 'Res. Tax',
-        'Com. Tax', 'Plot Tax', 'Water Tax (7.5%)', 'Sewer Tax (2.5%)', 'Total House Tax'
+        'Com. Tax', 'Plot Tax', 'Total House Tax'
       ];
 
       const rows = allItems.map(p => [
-        `"${p.ward_name || `वार्ड ${p.ward_no || 1}`}"`,
         p.sr_no || '',
         p.property_id || '',
         p.house_no || '',
@@ -397,20 +396,18 @@ export default function App() {
         p.mobile || '0',
         p.house_type || 'Residential',
         p.nirman || 'Pakka',
-        `"${p.road_width || ''}"`,
+        `"${(p.road_width || '0 To 09').replace(/"/g, '""')}"`,
         p.total_area || 0,
         p.covered_area || 0,
         p.business_area || 0,
         p.plot_area || 0,
-        p.house_tax_rate || 0.40,
-        p.plot_tax_rate || 0.10,
-        p.total_arv || 0,
-        p.res_tax || 0,
-        p.com_tax || 0,
-        p.plot_tax || 0,
-        p.water_tax || 0,
-        p.sewer_tax || 0,
-        p.total_tax || 0
+        p.house_tax_rate !== undefined && p.house_tax_rate !== null ? Number(p.house_tax_rate) : 0.40,
+        p.plot_tax_rate !== undefined && p.plot_tax_rate !== null ? Number(p.plot_tax_rate) : 0.10,
+        Math.round(Number(p.total_arv) || 0),
+        Math.round(Number(p.res_tax) || 0),
+        Math.round(Number(p.com_tax) || 0),
+        Math.round(Number(p.plot_tax) || 0),
+        Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : p.house_tax) || 0)
       ]);
 
       const csvContent = '\uFEFF' + [
@@ -465,22 +462,26 @@ export default function App() {
       });
 
       // Calculate totals
+      let sumTotalArea = 0;
+      let sumCoveredArea = 0;
+      let sumBusinessArea = 0;
+      let sumPlotArea = 0;
       let sumARV = 0;
       let sumResTax = 0;
       let sumComTax = 0;
       let sumPlotTax = 0;
-      let sumWaterTax = 0;
-      let sumSewerTax = 0;
-      let sumTotalTax = 0;
+      let sumTotalHouseTax = 0;
 
       allItems.forEach(p => {
-        sumARV += Number(p.total_arv) || 0;
-        sumResTax += Number(p.res_tax) || 0;
-        sumComTax += Number(p.com_tax) || 0;
-        sumPlotTax += Number(p.plot_tax) || 0;
-        sumWaterTax += Number(p.water_tax) || 0;
-        sumSewerTax += Number(p.sewer_tax) || 0;
-        sumTotalTax += Number(p.total_tax) || 0;
+        sumTotalArea += Number(p.total_area) || 0;
+        sumCoveredArea += Number(p.covered_area) || 0;
+        sumBusinessArea += Number(p.business_area) || 0;
+        sumPlotArea += Number(p.plot_area) || 0;
+        sumARV += Math.round(Number(p.total_arv) || 0);
+        sumResTax += Math.round(Number(p.res_tax) || 0);
+        sumComTax += Math.round(Number(p.com_tax) || 0);
+        sumPlotTax += Math.round(Number(p.plot_tax) || 0);
+        sumTotalHouseTax += Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : p.house_tax) || 0);
       });
 
       const printWindow = window.open('', '_blank');
@@ -492,23 +493,25 @@ export default function App() {
       const rowsHtml = allItems.map(p => `
         <tr>
           <td style="text-align: center;">${p.sr_no || ''}</td>
-          <td style="text-align: center; white-space: nowrap;">${p.ward_no ? `वार्ड ${String(p.ward_no).padStart(2, '0')}` : 'वार्ड 01'}</td>
-          <td style="font-weight: 600;">${p.property_id || ''}</td>
+          <td style="text-align: center; font-weight: 600; white-space: nowrap;">${p.property_id || ''}</td>
           <td style="text-align: center;">${p.house_no || ''}</td>
-          <td style="font-weight: 600;">${p.owner_name || ''}</td>
-          <td>${p.father_name || ''}</td>
-          <td style="text-align: center;">${p.mobile || ''}</td>
-          <td style="text-align: center;">${p.house_type || ''}</td>
-          <td style="text-align: center;">${p.nirman || ''}</td>
-          <td style="text-align: right;">${p.total_area || 0}</td>
-          <td style="text-align: right;">${p.covered_area || 0}</td>
-          <td style="text-align: right;">₹${(Number(p.total_arv) || 0).toLocaleString('en-IN')}</td>
-          <td style="text-align: right;">₹${(Number(p.res_tax) || 0).toLocaleString('en-IN')}</td>
-          <td style="text-align: right;">₹${(Number(p.com_tax) || 0).toLocaleString('en-IN')}</td>
-          <td style="text-align: right;">₹${(Number(p.plot_tax) || 0).toLocaleString('en-IN')}</td>
-          <td style="text-align: right; color: #1d4ed8; font-weight: 600;">₹${(Number(p.water_tax) || 0).toLocaleString('en-IN')}</td>
-          <td style="text-align: right; color: #15803d; font-weight: 600;">₹${(Number(p.sewer_tax) || 0).toLocaleString('en-IN')}</td>
-          <td style="text-align: right; font-weight: 700; color: #047857;">₹${(Number(p.total_tax) || 0).toLocaleString('en-IN')}</td>
+          <td style="text-align: left; padding-left: 4px; font-weight: 600;">${p.owner_name || ''}</td>
+          <td style="text-align: left; padding-left: 4px;">${p.father_name || ''}</td>
+          <td style="text-align: center;">${p.mobile || '0'}</td>
+          <td style="text-align: center;">${p.house_type || 'Residential'}</td>
+          <td style="text-align: center;">${p.nirman || 'Pakka'}</td>
+          <td style="text-align: center; white-space: nowrap;">${p.road_width || '0 To 09'}</td>
+          <td style="text-align: right; padding-right: 4px;">${p.total_area || 0}</td>
+          <td style="text-align: right; padding-right: 4px;">${p.covered_area || 0}</td>
+          <td style="text-align: right; padding-right: 4px;">${p.business_area || 0}</td>
+          <td style="text-align: right; padding-right: 4px;">${p.plot_area || 0}</td>
+          <td style="text-align: right; padding-right: 4px;">${p.house_tax_rate !== undefined && p.house_tax_rate !== null ? Number(p.house_tax_rate) : 0.4}</td>
+          <td style="text-align: right; padding-right: 4px;">${p.plot_tax_rate !== undefined && p.plot_tax_rate !== null ? Number(p.plot_tax_rate) : 0.1}</td>
+          <td style="text-align: right; padding-right: 4px;">${Math.round(Number(p.total_arv) || 0)}</td>
+          <td style="text-align: right; padding-right: 4px;">${Math.round(Number(p.res_tax) || 0)}</td>
+          <td style="text-align: right; padding-right: 4px;">${Math.round(Number(p.com_tax) || 0)}</td>
+          <td style="text-align: right; padding-right: 4px;">${Math.round(Number(p.plot_tax) || 0)}</td>
+          <td style="text-align: right; padding-right: 4px; font-weight: 700;">${Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : p.house_tax) || 0)}</td>
         </tr>
       `).join('');
 
@@ -521,16 +524,16 @@ export default function App() {
           <style>
             @page {
               size: A4 landscape;
-              margin: 7mm 6mm 10mm 6mm;
+              margin: 6mm 5mm 6mm 5mm;
             }
             * { box-sizing: border-box; }
             body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
               margin: 0;
-              padding: 12px;
-              color: #111827;
+              padding: 10px;
+              color: #000;
               background: #fff;
-              font-size: 10px;
+              font-size: 8px;
             }
             .no-print {
               display: flex;
@@ -545,72 +548,77 @@ export default function App() {
             }
             @media print {
               .no-print { display: none !important; }
-              body { padding: 0; }
+              body { padding: 0; margin: 0; }
               tr { page-break-inside: avoid; }
+              thead { display: table-header-group; }
+              tfoot { display: table-footer-group; }
             }
             .header-box {
               text-align: center;
-              border-bottom: 2px solid #1e3a8a;
-              padding-bottom: 6px;
-              margin-bottom: 8px;
+              border-bottom: 2px solid #000;
+              padding-bottom: 4px;
+              margin-bottom: 6px;
             }
             .palika-title {
-              font-size: 16px;
+              font-size: 15px;
               font-weight: 800;
-              color: #1e3a8a;
+              color: #000;
               letter-spacing: 0.5px;
             }
             .report-title {
-              font-size: 12px;
+              font-size: 11px;
               font-weight: 700;
-              color: #374151;
+              color: #111;
               margin-top: 2px;
             }
             .meta-strip {
               display: flex;
               justify-content: space-between;
-              font-size: 10px;
+              font-size: 9px;
               font-weight: 600;
-              color: #4b5563;
+              color: #000;
               margin-top: 4px;
-              background: #f1f5f9;
-              padding: 4px 10px;
+              background: #f8fafc;
+              padding: 3px 8px;
+              border: 1px solid #94a3b8;
               border-radius: 4px;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              font-size: 9.5px;
+              font-size: 7.5px;
+              border: 1.5px solid #000;
             }
             th, td {
-              border: 1px solid #94a3b8;
-              padding: 3.5px 4.5px;
+              border: 1px solid #000;
+              padding: 2.5px 2px;
+              line-height: 1.15;
             }
             th {
               background-color: #f1f5f9;
               font-weight: 700;
-              color: #0f172a;
+              color: #000;
               text-align: center;
-              white-space: nowrap;
+              vertical-align: middle;
             }
             .totals-row td {
               background-color: #e2e8f0;
               font-weight: 800;
-              border-top: 2px solid #0f172a;
+              border-top: 2px solid #000;
             }
             .signatures-box {
-              margin-top: 30px;
+              margin-top: 25px;
               display: flex;
               justify-content: space-between;
-              padding: 0 40px;
+              padding: 0 30px;
               page-break-inside: avoid;
             }
             .sig-item {
               text-align: center;
               font-weight: 700;
-              font-size: 10.5px;
-              border-top: 1px dashed #64748b;
-              padding-top: 5px;
+              font-size: 9.5px;
+              border-top: 1px dashed #000;
+              padding-top: 4px;
               min-width: 150px;
             }
             .btn {
@@ -646,7 +654,7 @@ export default function App() {
               <span><strong>📍 वार्ड:</strong> ${wardLabel}</span>
               <span><strong>कुल संपत्तियां:</strong> ${allItems.length}</span>
               <span><strong>वार्षिक ARV योग:</strong> ₹${sumARV.toLocaleString('en-IN')}</span>
-              <span><strong>कुल मांग (Total Tax):</strong> ₹${sumTotalTax.toLocaleString('en-IN')}</span>
+              <span><strong>कुल मांग (Total Tax):</strong> ₹${sumTotalHouseTax.toLocaleString('en-IN')}</span>
               <span><strong>दिनांक:</strong> ${currentDate}</span>
             </div>
             <div style="font-size: 8.5px; color: #475569; margin-top: 3px; font-weight: 600; text-align: center;">
@@ -657,37 +665,43 @@ export default function App() {
           <table>
             <thead>
               <tr>
-                <th>क्र.सं.</th>
-                <th>वार्ड</th>
-                <th>प्रॉपर्टी आईडी</th>
-                <th>भवन नं.</th>
-                <th>स्वामी का नाम</th>
-                <th>पिता/पति का नाम</th>
-                <th>मोबाइल</th>
-                <th>प्रकार</th>
-                <th>निर्माण</th>
-                <th>कुल एरिया</th>
-                <th>कवर्ड एरिया</th>
-                <th>नेट ARV (₹)</th>
-                <th>आवासीय (₹)</th>
-                <th>कमर्शियल (₹)</th>
-                <th>प्लॉट कर (₹)</th>
-                <th style="color: #1d4ed8;">जल कर (7.5%)</th>
-                <th style="color: #15803d;">सीवर कर (2.5%)</th>
-                <th style="color: #047857;">कुल गृहकर (₹)</th>
+                <th>Sr.no.</th>
+                <th>Property Id</th>
+                <th>House No.</th>
+                <th>Owner Name</th>
+                <th>Husband/Father Name</th>
+                <th>Mobile Number</th>
+                <th>House Type</th>
+                <th>Nirman Ki Prakriti</th>
+                <th>Road Width</th>
+                <th>Total Area</th>
+                <th>Covered Area</th>
+                <th>Business Area</th>
+                <th>Plot Area</th>
+                <th>House Tax Rate</th>
+                <th>Plot Tax Rate</th>
+                <th>Total ARV</th>
+                <th>Res. Tax</th>
+                <th>Com. Tax</th>
+                <th>Plot Tax</th>
+                <th>Total House Tax</th>
               </tr>
             </thead>
             <tbody>
               ${rowsHtml}
               <tr class="totals-row">
-                <td colspan="11" style="text-align: right; padding-right: 10px;">कुल महायोग (Grand Total):</td>
-                <td style="text-align: right;">₹${sumARV.toLocaleString('en-IN')}</td>
-                <td style="text-align: right;">₹${sumResTax.toLocaleString('en-IN')}</td>
-                <td style="text-align: right;">₹${sumComTax.toLocaleString('en-IN')}</td>
-                <td style="text-align: right;">₹${sumPlotTax.toLocaleString('en-IN')}</td>
-                <td style="text-align: right; color: #1d4ed8;">₹${sumWaterTax.toLocaleString('en-IN')}</td>
-                <td style="text-align: right; color: #15803d;">₹${sumSewerTax.toLocaleString('en-IN')}</td>
-                <td style="text-align: right; color: #047857; font-size: 10.5px;">₹${sumTotalTax.toLocaleString('en-IN')}</td>
+                <td colspan="9" style="text-align: right; font-weight: 800; padding-right: 8px;">कुल महायोग (Grand Total):</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumTotalArea}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumCoveredArea}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumBusinessArea}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumPlotArea}</td>
+                <td style="text-align: center; font-weight: 800;">-</td>
+                <td style="text-align: center; font-weight: 800;">-</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumARV.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumResTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumComTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumPlotTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px; font-size: 8.5px;">${sumTotalHouseTax.toLocaleString('en-IN')}</td>
               </tr>
             </tbody>
           </table>
