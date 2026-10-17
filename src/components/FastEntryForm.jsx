@@ -157,7 +157,8 @@ export default function FastEntryForm({
               setFormData(p => ({
                 ...p,
                 property_id: data.nextPropId,
-                house_no: data.nextHouse
+                house_no: data.nextHouse,
+                sr_no: data.nextSr
               }));
             }
           })
@@ -586,7 +587,8 @@ export default function FastEntryForm({
           setFormData(prev => ({
             ...prev,
             property_id: data.nextPropId || prev.property_id,
-            house_no: data.nextHouse || prev.house_no
+            house_no: data.nextHouse || prev.house_no,
+            sr_no: data.nextSr
           }));
         }
       } catch (err) {
@@ -648,6 +650,7 @@ export default function FastEntryForm({
         const currentHouseType = formData.house_type || 'Residential';
         let newPropId = '';
         let newHouseNo = '';
+        let newSrNo = null;
 
         try {
           const res = await fetch(`/api/next-id?ward_no=${currentWardNo}&house_type=${currentHouseType}`);
@@ -655,6 +658,7 @@ export default function FastEntryForm({
           if (res.ok) {
             newPropId = data.nextPropId;
             newHouseNo = data.nextHouse;
+            newSrNo = data.nextSr;
           }
         } catch (fetchErr) {
           console.error('Next id fetch error', fetchErr);
@@ -663,7 +667,7 @@ export default function FastEntryForm({
         // If fetch didn't return, fallback to numeric advance
         if (!newHouseNo) {
           const parsed = parseInt(String(formData.house_no).replace(/\D/g, ''), 10);
-          newHouseNo = parsed ? String(parsed + 1) : '10370';
+          newHouseNo = parsed ? String(parsed + 1) : '10001';
           const prefix = formData.property_id.slice(0, 11) || '09037010010';
           const suffix = getSuffixForType(currentHouseType);
           newPropId = `${prefix}${newHouseNo.padStart(5, '0')}${suffix}`;
@@ -674,6 +678,7 @@ export default function FastEntryForm({
           ...prev,
           property_id: newPropId,
           house_no: newHouseNo,
+          sr_no: newSrNo || ((Number(prev.sr_no) || 0) + 1),
           owner_name: '',
           father_name: '',
           mobile: '',
@@ -710,7 +715,9 @@ export default function FastEntryForm({
       <div className="card-header">
         <div>
           <div className="card-title">
-            {editingRecord ? `✏️ प्रविष्टि संपादन (क्र.सं. ${editingRecord.sr_no})` : '✍️ नया कर निर्धारण एवं डेटा प्रविष्टि'}
+            {editingRecord 
+              ? `✏️ प्रविष्टि संपादन (क्र.सं. ${editingRecord.sr_no})` 
+              : `✍️ नया कर निर्धारण एवं डेटा प्रविष्टि (वार्ड क्र.सं. ${formData.sr_no || nextIds?.nextSr || 1})`}
           </div>
           <div className="card-desc">
             {formData.ward_name} • स्वतः 17-अंक आईडी • लम्बाई × चौड़ाई कैलकुलेटर • जलकर/सीवर कर विकल्प
