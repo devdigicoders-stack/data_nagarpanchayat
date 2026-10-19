@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://data-nagarpanchayat-backend.onrender.com/api/$1"
+      "destination": "https://databackend-iti1.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
