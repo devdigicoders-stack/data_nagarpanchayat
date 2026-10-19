@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Printer } from 'lucide-react';
 import { numberToHindiWords } from '../utils/hindiWords';
 
@@ -10,20 +10,23 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
     };
   }, []);
 
+  const initialHasWater = Boolean(property?.has_water_tax || Number(property?.water_tax) > 0);
+  const initialHasSewer = Boolean(property?.has_sewer_tax || Number(property?.sewer_tax) > 0);
+
+  const [includeWaterTax, setIncludeWaterTax] = useState(initialHasWater);
+  const [includeSewerTax, setIncludeSewerTax] = useState(initialHasSewer);
+
   if (!property) return null;
 
-  const totalTax = Number(property.total_tax) || 0;
   const totalARV = Number(property.total_arv) || 0;
   const resTax = Number(property.res_tax) || 0;
   const comTax = Number(property.com_tax) || 0;
   const plotTax = Number(property.plot_tax) || 0;
   const houseTax = Number(property.house_tax) || (resTax + comTax + plotTax);
 
-  const hasWaterTax = Boolean(property.has_water_tax);
-  const waterTax = Number(property.water_tax) || (hasWaterTax ? Math.round(totalARV * 0.075) : 0);
-
-  const hasSewerTax = Boolean(property.has_sewer_tax);
-  const sewerTax = Number(property.sewer_tax) || (hasSewerTax ? Math.round(totalARV * 0.025) : 0);
+  const waterTax = includeWaterTax ? (Number(property.water_tax) || Math.round(totalARV * 0.075)) : 0;
+  const sewerTax = includeSewerTax ? (Number(property.sewer_tax) || Math.round(totalARV * 0.025)) : 0;
+  const calculatedTotalTax = houseTax + waterTax + sewerTax;
 
   const totArea = Number(property.total_area) || 0;
   const covArea = Number(property.covered_area) || 0;
@@ -37,7 +40,7 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
   const busLength = Number(property.business_length) || 0;
   const busWidth = Number(property.business_width) || 0;
 
-  const words = numberToHindiWords(totalTax);
+  const words = numberToHindiWords(calculatedTotalTax);
   const receiptNo = `HT/2026-27/${String(property.sr_no).padStart(4, '0')}`;
   const assessmentDate = new Date().toLocaleDateString('hi-IN', {
     day: '2-digit', month: '2-digit', year: 'numeric'
@@ -64,6 +67,71 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
           <button className="btn btn-outline btn-sm btn-icon-only" onClick={onClose}>
             <X size={16} />
           </button>
+        </div>
+
+        {/* Tax Toggle Toolbar (Hidden during print) */}
+        <div className="hide-on-print" style={{ 
+          background: 'var(--bg-hover, #f8fafc)', 
+          borderBottom: '1.5px solid var(--border-color)', 
+          padding: '10px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12
+        }}>
+          <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>⚙️ पीडीएफ / पर्ची में कर विकल्प (Tax Options for PDF):</span>
+          </div>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+            <label style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: 8, 
+              cursor: 'pointer', 
+              fontSize: '0.86rem', 
+              fontWeight: 700, 
+              color: '#1d4ed8',
+              background: includeWaterTax ? '#eff6ff' : '#fff',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              border: includeWaterTax ? '1.5px solid #3b82f6' : '1px solid #cbd5e1',
+              boxShadow: includeWaterTax ? '0 1px 3px rgba(59,130,246,0.15)' : 'none',
+              transition: 'all 0.15s ease'
+            }}>
+              <input 
+                type="checkbox" 
+                checked={includeWaterTax} 
+                onChange={(e) => setIncludeWaterTax(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#1d4ed8', cursor: 'pointer' }}
+              />
+              🚰 जलकर जोड़ें (7.5%) {includeWaterTax ? `— ₹${waterTax.toLocaleString('en-IN')}` : ''}
+            </label>
+
+            <label style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: 8, 
+              cursor: 'pointer', 
+              fontSize: '0.86rem', 
+              fontWeight: 700, 
+              color: '#15803d',
+              background: includeSewerTax ? '#f0fdf4' : '#fff',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              border: includeSewerTax ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+              boxShadow: includeSewerTax ? '0 1px 3px rgba(16,185,129,0.15)' : 'none',
+              transition: 'all 0.15s ease'
+            }}>
+              <input 
+                type="checkbox" 
+                checked={includeSewerTax} 
+                onChange={(e) => setIncludeSewerTax(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#15803d', cursor: 'pointer' }}
+              />
+              🚽 सीवर कर जोड़ें (2.5%) {includeSewerTax ? `— ₹${sewerTax.toLocaleString('en-IN')}` : ''}
+            </label>
+          </div>
         </div>
 
         <div className="modal-body">
@@ -171,33 +239,31 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                   <td style={{ color: '#0369a1' }}>₹{houseTax.toLocaleString('en-IN')}</td>
                 </tr>
 
-                {/* Water Tax Row if active */}
-                {hasWaterTax && (
-                  <tr style={{ background: '#eff6ff' }}>
-                    <td colSpan="2"><strong>🚰 जलकर (Water Tax - 7.5%)</strong></td>
-                    <td colSpan="2">शुद्ध ARV (₹{totalARV.toLocaleString('en-IN')}) पर आधारित</td>
-                    <td>7.5%</td>
-                    <td style={{ color: '#1d4ed8', fontWeight: 700 }}>₹{waterTax.toLocaleString('en-IN')}</td>
-                  </tr>
-                )}
+                {/* Water Tax Row */}
+                <tr style={{ background: includeWaterTax ? '#eff6ff' : 'transparent' }}>
+                  <td colSpan="2"><strong>🚰 जलकर (Water Tax - 7.5%)</strong></td>
+                  <td colSpan="2">{includeWaterTax ? `शुद्ध ARV (₹${totalARV.toLocaleString('en-IN')}) पर आधारित` : 'लागू नहीं / विकल्प निष्क्रिय'}</td>
+                  <td>{includeWaterTax ? '7.5%' : '0%'}</td>
+                  <td style={{ color: includeWaterTax ? '#1d4ed8' : '#64748b', fontWeight: includeWaterTax ? 700 : 500 }}>
+                    ₹{waterTax.toLocaleString('en-IN')}
+                  </td>
+                </tr>
 
-                {/* Sewer Tax Row if active */}
-                {hasSewerTax && (
-                  <tr style={{ background: '#f0fdf4' }}>
-                    <td colSpan="2"><strong>🚽 सीवर कर (Sewer Tax - 2.5%)</strong></td>
-                    <td colSpan="2">शुद्ध ARV (₹{totalARV.toLocaleString('en-IN')}) पर आधारित</td>
-                    <td>2.5%</td>
-                    <td style={{ color: '#15803d', fontWeight: 700 }}>₹{sewerTax.toLocaleString('en-IN')}</td>
-                  </tr>
-                )}
+                {/* Sewer Tax Row */}
+                <tr style={{ background: includeSewerTax ? '#f0fdf4' : 'transparent' }}>
+                  <td colSpan="2"><strong>🚽 सीवर कर (Sewer Tax - 2.5%)</strong></td>
+                  <td colSpan="2">{includeSewerTax ? `शुद्ध ARV (₹${totalARV.toLocaleString('en-IN')}) पर आधारित` : 'लागू नहीं / विकल्प निष्क्रिय'}</td>
+                  <td>{includeSewerTax ? '2.5%' : '0%'}</td>
+                  <td style={{ color: includeSewerTax ? '#15803d' : '#64748b', fontWeight: includeSewerTax ? 700 : 500 }}>
+                    ₹{sewerTax.toLocaleString('en-IN')}
+                  </td>
+                </tr>
 
                 {/* Grand Total Row */}
-                {(hasWaterTax || hasSewerTax) && (
-                  <tr style={{ background: '#e2e8f0', fontWeight: 800 }}>
-                    <td colSpan="5">कुल वार्षिक मांग (गृहकर + जलकर + सीवर कर)</td>
-                    <td style={{ color: 'var(--success)' }}>₹{totalTax.toLocaleString('en-IN')}</td>
-                  </tr>
-                )}
+                <tr style={{ background: '#e2e8f0', fontWeight: 800 }}>
+                  <td colSpan="5">कुल वार्षिक मांग (गृहकर + जलकर + सीवर कर)</td>
+                  <td style={{ color: 'var(--success)' }}>₹{calculatedTotalTax.toLocaleString('en-IN')}</td>
+                </tr>
               </tbody>
             </table>
 
@@ -209,7 +275,7 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                 </div>
               </div>
               <div style={{ fontSize: '1.6rem', color: '#059669', fontWeight: 800 }}>
-                ₹{totalTax.toLocaleString('en-IN')}
+                ₹{calculatedTotalTax.toLocaleString('en-IN')}
               </div>
             </div>
 

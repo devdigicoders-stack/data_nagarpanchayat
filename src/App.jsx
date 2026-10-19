@@ -384,7 +384,7 @@ export default function App() {
         'Mobile Number', 'House Type', 'Nirman Ki Prakriti', 'Road Width',
         'Total Area', 'Covered Area', 'Business Area', 'Plot Area',
         'House Tax Rate', 'Plot Tax Rate', 'Total ARV', 'Res. Tax',
-        'Com. Tax', 'Plot Tax', 'Total House Tax'
+        'Com. Tax', 'Plot Tax', 'Water Tax (7.5%)', 'Sewer Tax (2.5%)', 'Total Tax'
       ];
 
       const rows = allItems.map(p => [
@@ -407,7 +407,9 @@ export default function App() {
         Math.round(Number(p.res_tax) || 0),
         Math.round(Number(p.com_tax) || 0),
         Math.round(Number(p.plot_tax) || 0),
-        Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : p.house_tax) || 0)
+        Math.round(Number(p.water_tax) || 0),
+        Math.round(Number(p.sewer_tax) || 0),
+        Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : ((Number(p.house_tax) || 0) + (Number(p.water_tax) || 0) + (Number(p.sewer_tax) || 0))) || 0)
       ]);
 
       const csvContent = '\uFEFF' + [
@@ -470,9 +472,15 @@ export default function App() {
       let sumResTax = 0;
       let sumComTax = 0;
       let sumPlotTax = 0;
-      let sumTotalHouseTax = 0;
+      let sumWaterTax = 0;
+      let sumSewerTax = 0;
+      let sumTotalTax = 0;
 
       allItems.forEach(p => {
+        const wTax = Math.round(Number(p.water_tax) || (p.has_water_tax ? Math.round((Number(p.total_arv) || 0) * 0.075) : 0));
+        const sTax = Math.round(Number(p.sewer_tax) || (p.has_sewer_tax ? Math.round((Number(p.total_arv) || 0) * 0.025) : 0));
+        const tTax = Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : ((Number(p.house_tax) || 0) + wTax + sTax)) || 0);
+
         sumTotalArea += Number(p.total_area) || 0;
         sumCoveredArea += Number(p.covered_area) || 0;
         sumBusinessArea += Number(p.business_area) || 0;
@@ -481,7 +489,9 @@ export default function App() {
         sumResTax += Math.round(Number(p.res_tax) || 0);
         sumComTax += Math.round(Number(p.com_tax) || 0);
         sumPlotTax += Math.round(Number(p.plot_tax) || 0);
-        sumTotalHouseTax += Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : p.house_tax) || 0);
+        sumWaterTax += wTax;
+        sumSewerTax += sTax;
+        sumTotalTax += tTax;
       });
 
       const printWindow = window.open('', '_blank');
@@ -490,7 +500,12 @@ export default function App() {
         return;
       }
 
-      const rowsHtml = allItems.map(p => `
+      const rowsHtml = allItems.map(p => {
+        const wTax = Math.round(Number(p.water_tax) || (p.has_water_tax ? Math.round((Number(p.total_arv) || 0) * 0.075) : 0));
+        const sTax = Math.round(Number(p.sewer_tax) || (p.has_sewer_tax ? Math.round((Number(p.total_arv) || 0) * 0.025) : 0));
+        const tTax = Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : ((Number(p.house_tax) || 0) + wTax + sTax)) || 0);
+
+        return `
         <tr>
           <td style="text-align: center;">${p.sr_no || ''}</td>
           <td style="text-align: center; font-weight: 600; white-space: nowrap;">${p.property_id || ''}</td>
@@ -511,29 +526,32 @@ export default function App() {
           <td style="text-align: right; padding-right: 4px;">${Math.round(Number(p.res_tax) || 0)}</td>
           <td style="text-align: right; padding-right: 4px;">${Math.round(Number(p.com_tax) || 0)}</td>
           <td style="text-align: right; padding-right: 4px;">${Math.round(Number(p.plot_tax) || 0)}</td>
-          <td style="text-align: right; padding-right: 4px; font-weight: 700;">${Math.round(Number(p.total_tax !== undefined && p.total_tax !== null ? p.total_tax : p.house_tax) || 0)}</td>
+          <td style="text-align: right; padding-right: 4px; color: #1d4ed8; font-weight: 600;">${wTax > 0 ? `₹${wTax}` : '0'}</td>
+          <td style="text-align: right; padding-right: 4px; color: #15803d; font-weight: 600;">${sTax > 0 ? `₹${sTax}` : '0'}</td>
+          <td style="text-align: right; padding-right: 4px; font-weight: 700;">₹${tTax}</td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
 
       const htmlContent = `
         <!DOCTYPE html>
         <html lang="hi">
         <head>
           <meta charset="utf-8">
-          <title>वार्षिक गृहकर रजिस्टर - ${wardLabel}</title>
+          <title>वार्षिक गृहकर एवं संपत्ति रजिस्टर - ${wardLabel}</title>
           <style>
             @page {
               size: A4 landscape;
-              margin: 6mm 5mm 6mm 5mm;
+              margin: 6mm 4mm 6mm 4mm;
             }
             * { box-sizing: border-box; }
             body {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
               margin: 0;
-              padding: 10px;
+              padding: 8px;
               color: #000;
               background: #fff;
-              font-size: 8px;
+              font-size: 7.8px;
             }
             .no-print {
               display: flex;
@@ -574,7 +592,7 @@ export default function App() {
             .meta-strip {
               display: flex;
               justify-content: space-between;
-              font-size: 9px;
+              font-size: 8.5px;
               font-weight: 600;
               color: #000;
               margin-top: 4px;
@@ -582,16 +600,18 @@ export default function App() {
               padding: 3px 8px;
               border: 1px solid #94a3b8;
               border-radius: 4px;
+              flex-wrap: wrap;
+              gap: 4px;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              font-size: 7.5px;
+              font-size: 7.2px;
               border: 1.5px solid #000;
             }
             th, td {
               border: 1px solid #000;
-              padding: 2.5px 2px;
+              padding: 2.2px 1.8px;
               line-height: 1.15;
             }
             th {
@@ -636,7 +656,7 @@ export default function App() {
         <body>
           <div class="no-print">
             <div style="font-size: 13px; font-weight: 700; color: #1e3a8a;">
-              📄 संपत्ति एवं वार्षिक गृहकर रजिस्टर (${allItems.length} संपत्तियां)
+              📄 संपत्ति, वार्षिक गृहकर, जलकर एवं सीवर कर रजिस्टर (${allItems.length} संपत्तियां)
               <span style="font-size: 11px; font-weight: 500; color: #475569; margin-left: 10px;">
                 💡 टिप: प्रिंट विंडो में 'Destination' में 'Save as PDF' चुनकर सीधे PDF फाइल डाउनलोड कर सकते हैं।
               </span>
@@ -649,16 +669,18 @@ export default function App() {
 
           <div class="header-box">
             <div class="palika-title">🏛️ ${palikaName}</div>
-            <div class="report-title">वार्षिक गृहकर एवं संपत्ति कर निर्धारण संपूर्ण रजिस्टर (House Tax Register) • वित्तीय वर्ष 2026-27</div>
+            <div class="report-title">वार्षिक गृहकर, जलकर एवं सीवर कर निर्धारण संपूर्ण रजिस्टर (House & Civic Tax Register) • वित्तीय वर्ष 2026-27</div>
             <div class="meta-strip">
               <span><strong>📍 वार्ड:</strong> ${wardLabel}</span>
               <span><strong>कुल संपत्तियां:</strong> ${allItems.length}</span>
               <span><strong>वार्षिक ARV योग:</strong> ₹${sumARV.toLocaleString('en-IN')}</span>
-              <span><strong>कुल मांग (Total Tax):</strong> ₹${sumTotalHouseTax.toLocaleString('en-IN')}</span>
+              <span><strong>कुल जलकर:</strong> ₹${sumWaterTax.toLocaleString('en-IN')}</span>
+              <span><strong>कुल सीवर कर:</strong> ₹${sumSewerTax.toLocaleString('en-IN')}</span>
+              <span><strong>कुल कर मांग (Total Demand):</strong> ₹${sumTotalTax.toLocaleString('en-IN')}</span>
               <span><strong>दिनांक:</strong> ${currentDate}</span>
             </div>
             <div style="font-size: 8.5px; color: #475569; margin-top: 3px; font-weight: 600; text-align: center;">
-              नियम: आवासीय गृहकर दर ARV का 10% • व्यावसायिक संपत्ति दर ARV का 20% (दोगुना - 2x) • सरकारी संपत्ति दर ARV का 30% (तीन गुना - 3x)
+              नियम: आवासीय गृहकर ARV का 10% • व्यावसायिक दर ARV का 20% (दोगुना - 2x) • सरकारी दर ARV का 30% (तीन गुना - 3x) • जलकर शुद्ध ARV का 7.5% • सीवर कर शुद्ध ARV का 2.5%
             </div>
           </div>
 
@@ -684,7 +706,9 @@ export default function App() {
                 <th>Res. Tax</th>
                 <th>Com. Tax</th>
                 <th>Plot Tax</th>
-                <th>Total House Tax</th>
+                <th style="color: #1d4ed8;">जल कर (7.5%)</th>
+                <th style="color: #15803d;">सीवर कर (2.5%)</th>
+                <th>कुल कर मांग</th>
               </tr>
             </thead>
             <tbody>
@@ -697,11 +721,13 @@ export default function App() {
                 <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumPlotArea}</td>
                 <td style="text-align: center; font-weight: 800;">-</td>
                 <td style="text-align: center; font-weight: 800;">-</td>
-                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumARV.toLocaleString('en-IN')}</td>
-                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumResTax.toLocaleString('en-IN')}</td>
-                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumComTax.toLocaleString('en-IN')}</td>
-                <td style="text-align: right; font-weight: 800; padding-right: 4px;">${sumPlotTax.toLocaleString('en-IN')}</td>
-                <td style="text-align: right; font-weight: 800; padding-right: 4px; font-size: 8.5px;">${sumTotalHouseTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">₹${sumARV.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">₹${sumResTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">₹${sumComTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px;">₹${sumPlotTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px; color: #1d4ed8;">₹${sumWaterTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px; color: #15803d;">₹${sumSewerTax.toLocaleString('en-IN')}</td>
+                <td style="text-align: right; font-weight: 800; padding-right: 4px; font-size: 8.5px;">₹${sumTotalTax.toLocaleString('en-IN')}</td>
               </tr>
             </tbody>
           </table>
