@@ -152,12 +152,17 @@ export default function App() {
     }
   };
 
-  const loadNextIds = async (wNo = selectedWard) => {
+  const loadNextIds = async (wNo) => {
     try {
-      const url = (wNo && wNo !== 'all') ? `/api/next-id?ward_no=${wNo}` : '/api/next-id';
+      const activeW = (wNo && wNo !== 'all') 
+        ? wNo 
+        : (Number(localStorage.getItem('sticky_active_ward_no')) || settings?.active_ward_no || (wards && wards[0]?.ward_no) || 1);
+      const url = `/api/next-id?ward_no=${activeW}&_t=${Date.now()}`;
       const res = await fetch(url);
       const data = await res.json();
-      setNextIds(data);
+      if (res.ok) {
+        setNextIds(data);
+      }
     } catch (err) {
       console.error('Failed to load next IDs', err);
     }
@@ -339,6 +344,10 @@ export default function App() {
       const data = await res.json();
       setSettings(data);
       showToast('सेटिंग्स MongoDB में सुरक्षित हो गईं!');
+      loadWards();
+      loadNextIds(data.active_ward_no);
+      loadProperties();
+      loadStats();
     } catch (err) {
       showToast('सेटिंग्स अपडेट करने में विफलता', 'error');
     }
@@ -797,6 +806,8 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         onNewEntry={() => {
           setEditingRecord(null);
+          const activeW = Number(localStorage.getItem('sticky_active_ward_no')) || settings?.active_ward_no || (wards && wards[0]?.ward_no) || 1;
+          loadNextIds(activeW);
           setActiveTab('tabEntry');
         }}
         onOpenLogin={() => {
@@ -829,6 +840,8 @@ export default function App() {
                 showToast('दर्शक (Viewer) को नया कर निर्धारण जोड़ने की अनुमति नहीं है।', 'warning');
                 return;
               }
+              const activeW = Number(localStorage.getItem('sticky_active_ward_no')) || settings?.active_ward_no || (wards && wards[0]?.ward_no) || 1;
+              loadNextIds(activeW);
               setActiveTab('tabEntry');
             }}
           >
@@ -943,6 +956,8 @@ export default function App() {
               setWards(updatedWards);
               loadStats(selectedWard);
               loadProperties();
+              const activeW = Number(localStorage.getItem('sticky_active_ward_no')) || settings?.active_ward_no || (updatedWards && updatedWards[0]?.ward_no) || 1;
+              loadNextIds(activeW);
             }}
           />
         )}

@@ -1,6 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Save, RotateCcw, Zap, ArrowRightCircle, PlusCircle, CheckCircle2, Building2, Layers } from 'lucide-react';
 
+export const buildPropertyId = (prefix, houseNo, houseType = 'Residential') => {
+  const typeSuffixMap = {
+    'Residential': 'R',
+    'Commercial': 'C',
+    'Mixed': 'M',
+    'Plot': 'P',
+    'Government': 'G'
+  };
+  const suffix = typeSuffixMap[houseType] || 'R';
+  let cleanPrefix = String(prefix || '').replace(/\D/g, '');
+  if (!cleanPrefix) cleanPrefix = '09037010010';
+
+  const houseStr = String(houseNo || '').replace(/\D/g, '') || '10001';
+  let padHouse = houseStr;
+  if (cleanPrefix.length + houseStr.length < 16) {
+    padHouse = houseStr.padStart(16 - cleanPrefix.length, '0');
+  } else if (cleanPrefix.length + houseStr.length > 16) {
+    if (cleanPrefix.length > 16 - houseStr.length) {
+      cleanPrefix = cleanPrefix.slice(0, Math.max(0, 16 - houseStr.length));
+    }
+  }
+  return `${cleanPrefix}${padHouse}${suffix}`;
+};
+
 export default function FastEntryForm({ 
   nextIds, 
   settings, 
@@ -107,18 +131,25 @@ export default function FastEntryForm({
         sewer_tax_percent: Number(editingRecord.sewer_tax_percent ?? 2.5)
       });
     } else {
-      const savedWardNo = Number(localStorage.getItem('sticky_active_ward_no')) || settings?.active_ward_no || 1;
-      const defaultWard = wards.find(w => w.ward_no === savedWardNo) || wards[0];
+      const savedWardNo = Number(localStorage.getItem('sticky_active_ward_no')) || settings?.active_ward_no || (wards && wards[0]?.ward_no) || 1;
+      const defaultWard = (wards || []).find(w => w.ward_no === savedWardNo) || wards[0];
       const targetWardNo = defaultWard?.ward_no || 1;
-      const targetWardName = defaultWard?.ward_name || 'वार्ड 01 - अध्यक्ष';
+      const targetWardName = defaultWard?.ward_name || `वार्ड ${String(targetWardNo).padStart(2, '0')}`;
       const houseType = settings?.sticky_house_type || 'Residential';
+      const wardPrefix = defaultWard?.id_prefix || settings?.id_prefix || '09037010010';
+
+      const initialHouse = (nextIds && nextIds.ward_no === targetWardNo && nextIds.nextHouse) ? nextIds.nextHouse : '10001';
+      const initialPropId = (nextIds && nextIds.ward_no === targetWardNo && nextIds.nextPropId)
+        ? nextIds.nextPropId
+        : buildPropertyId(wardPrefix, initialHouse, houseType);
 
       setFormData(prev => ({
         ...prev,
         ward_no: targetWardNo,
         ward_name: targetWardName,
-        property_id: nextIds?.nextPropId || '0903701001010369R',
-        house_no: nextIds?.nextHouse || '10369',
+        property_id: initialPropId,
+        house_no: initialHouse,
+        sr_no: (nextIds && nextIds.ward_no === targetWardNo) ? nextIds.nextSr : 1,
         owner_name: '',
         father_name: '',
         mobile: '',
@@ -148,24 +179,24 @@ export default function FastEntryForm({
         sewer_tax_percent: 2.5
       }));
 
-      // If active ward is not ward 1, fetch proper ID for this ward
-      if (targetWardNo !== 1 && (!nextIds || nextIds.ward_no !== targetWardNo)) {
-        fetch(`/api/next-id?ward_no=${targetWardNo}&house_type=${houseType}`)
-          .then(r => r.json())
-          .then(data => {
-            if (data.nextPropId) {
-              setFormData(p => ({
-                ...p,
-                property_id: data.nextPropId,
-                house_no: data.nextHouse,
-                sr_no: data.nextSr
-              }));
-            }
-          })
-          .catch(err => console.error('Error fetching ward next ID', err));
-      }
+      // Always fetch fresh ID for the target ward to ensure up-to-date prefix, sr_no and house_no
+      fetch(`/api/next-id?ward_no=${targetWardNo}&house_type=${houseType}&_t=${Date.now()}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.nextPropId) {
+            setFormData(p => ({
+              ...p,
+              ward_no: targetWardNo,
+              ward_name: targetWardName,
+              property_id: data.nextPropId,
+              house_no: data.nextHouse,
+              sr_no: data.nextSr
+            }));
+          }
+        })
+        .catch(err => console.error('Error fetching ward next ID', err));
     }
-  }, [editingRecord, nextIds, settings, wards]);
+  }, [editingRecord, wards, settings]);
 
   const handleChange = (field, value) => {
     setFormData(prev => {
@@ -173,6 +204,12 @@ export default function FastEntryForm({
 
       if (field === 'nirman') {
         next.house_tax_rate = getRateForNirman(value, settings);
+      }
+
+      if (field === 'house_no' && !editingRecord) {
+        const currentWard = (wards || []).find(w => w.ward_no === prev.ward_no);
+        const currentPrefix = currentWard?.id_prefix || settings?.id_prefix;
+        next.property_id = buildPropertyId(currentPrefix, value, prev.house_type);
       }
 
       if (field === 'total_area') {
@@ -207,10 +244,16 @@ export default function FastEntryForm({
 
       if (field === 'house_type') {
         const suffix = getSuffixForType(value);
-        if (/[A-Z]$/i.test(prev.property_id)) {
-          next.property_id = prev.property_id.slice(0, -1) + suffix;
+        if (!editingRecord) {
+          const currentWard = (wards || []).find(w => w.ward_no === prev.ward_no);
+          const currentPrefix = currentWard?.id_prefix || settings?.id_prefix;
+          next.property_id = buildPropertyId(currentPrefix, prev.house_no, value);
         } else {
-          next.property_id = prev.property_id + suffix;
+          if (/[A-Z]$/i.test(prev.property_id)) {
+            next.property_id = prev.property_id.slice(0, -1) + suffix;
+          } else {
+            next.property_id = prev.property_id + suffix;
+          }
         }
 
         if (value === 'Plot') {
@@ -568,24 +611,30 @@ export default function FastEntryForm({
 
   const handleWardSelect = async (wNo) => {
     const num = Number(wNo);
-    const found = wards.find(w => w.ward_no === num);
+    const found = (wards || []).find(w => w.ward_no === num);
     const wName = found ? found.ward_name : `वार्ड ${String(num).padStart(2, '0')}`;
     
     localStorage.setItem('sticky_active_ward_no', String(num));
 
+    const tempPrefix = found?.id_prefix || settings?.id_prefix;
     setFormData(prev => ({
       ...prev,
       ward_no: num,
-      ward_name: wName
+      ward_name: wName,
+      property_id: (!editingRecord && tempPrefix)
+        ? buildPropertyId(tempPrefix, prev.house_no, prev.house_type)
+        : prev.property_id
     }));
 
     if (!editingRecord) {
       try {
-        const res = await fetch(`/api/next-id?ward_no=${num}&house_type=${formData.house_type}`);
+        const res = await fetch(`/api/next-id?ward_no=${num}&house_type=${formData.house_type}&_t=${Date.now()}`);
         const data = await res.json();
         if (res.ok) {
           setFormData(prev => ({
             ...prev,
+            ward_no: num,
+            ward_name: wName,
             property_id: data.nextPropId || prev.property_id,
             house_no: data.nextHouse || prev.house_no,
             sr_no: data.nextSr
@@ -653,7 +702,7 @@ export default function FastEntryForm({
         let newSrNo = null;
 
         try {
-          const res = await fetch(`/api/next-id?ward_no=${currentWardNo}&house_type=${currentHouseType}`);
+          const res = await fetch(`/api/next-id?ward_no=${currentWardNo}&house_type=${currentHouseType}&_t=${Date.now()}`);
           const data = await res.json();
           if (res.ok) {
             newPropId = data.nextPropId;
@@ -668,9 +717,9 @@ export default function FastEntryForm({
         if (!newHouseNo) {
           const parsed = parseInt(String(formData.house_no).replace(/\D/g, ''), 10);
           newHouseNo = parsed ? String(parsed + 1) : '10001';
-          const prefix = formData.property_id.slice(0, 11) || '09037010010';
-          const suffix = getSuffixForType(currentHouseType);
-          newPropId = `${prefix}${newHouseNo.padStart(5, '0')}${suffix}`;
+          const currentWard = (wards || []).find(w => w.ward_no === currentWardNo);
+          const prefix = currentWard?.id_prefix || settings?.id_prefix;
+          newPropId = buildPropertyId(prefix, newHouseNo, currentHouseType);
         }
 
         // Reset fields for the next entry while preserving sticky settings

@@ -62,7 +62,7 @@ export default function WardManagementTab({ token, currentUser, showToast, onWar
       ...prev,
       ward_no: num,
       ward_name: prev.ward_name || (num ? `वार्ड ${pad} - ` : ''),
-      id_prefix: num ? `090370${pad}0010` : prev.id_prefix
+      id_prefix: num ? `09037${pad}0010` : prev.id_prefix
     }));
   };
 
