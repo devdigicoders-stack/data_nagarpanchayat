@@ -194,7 +194,7 @@ export default function RegisterTable({
         <table className="data-table">
           <thead>
             <tr>
-              <th className="sortable" onClick={() => onSortChange('sr_no')}>क्र.सं. ⬍</th>
+              <th className="sortable sticky-col-sr" onClick={() => onSortChange('sr_no')}>क्र.सं. ⬍</th>
               <th>वार्ड</th>
               <th className="sortable" onClick={() => onSortChange('property_id')}>प्रॉपर्टी आईडी ⬍</th>
               <th className="sortable" onClick={() => onSortChange('house_no')}>हाउस नं. ⬍</th>
@@ -253,7 +253,7 @@ export default function RegisterTable({
                 const typeClass = (p.house_type || 'residential').toLowerCase();
                 return (
                   <tr key={p._id || p.property_id}>
-                    <td>{p.sr_no}</td>
+                    <td className="sticky-col-sr"><strong>{p.sr_no}</strong></td>
                     <td>
                       <span 
                         className="badge-ward" 

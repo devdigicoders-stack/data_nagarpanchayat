@@ -743,6 +743,27 @@ body {
   background-color: var(--bg-subtle);
 }
 
+/* Sticky First Column (Serial Number) */
+.sticky-col-sr {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background-color: var(--bg-card);
+  border-right: 2px solid var(--border-color) !important;
+  box-shadow: 2px 0 6px -1px rgba(0, 0, 0, 0.08);
+  min-width: 60px;
+  text-align: center;
+}
+
+.data-table th.sticky-col-sr {
+  z-index: 5;
+  background-color: var(--bg-subtle);
+}
+
+.data-table tr:hover td.sticky-col-sr {
+  background-color: var(--bg-subtle);
+}
+
 /* Badges */
 .badge-type {
   display: inline-block;
