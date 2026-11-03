@@ -61,13 +61,13 @@ export default function FastEntryForm({
     road_width: '0 से 9 मीटर',
     total_length: '',
     total_width: '',
-    total_area: 600,
+    total_area: '',
     covered_length: '',
     covered_width: '',
-    covered_area: 600,
+    covered_area: '',
     floors_count: 1,
     floors: [
-      { id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: 600 }
+      { id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: '' }
     ],
     business_length: '',
     business_width: '',
@@ -158,12 +158,12 @@ export default function FastEntryForm({
         road_width: settings?.sticky_road_width || '0 से 9 मीटर',
         total_length: '',
         total_width: '',
-        total_area: 600,
+        total_area: '',
         covered_length: '',
         covered_width: '',
-        covered_area: 600,
+        covered_area: '',
         floors_count: 1,
-        floors: [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: 600 }],
+        floors: [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: '' }],
         business_length: '',
         business_width: '',
         business_area: 0,
@@ -256,6 +256,13 @@ export default function FastEntryForm({
           }
         }
 
+        const lowerVal = (value || '').toLowerCase();
+        if (lowerVal === 'commercial' || lowerVal === 'government') {
+          next.discount_percent = 0;
+        } else if (prev.house_type === 'Commercial' || prev.house_type === 'Government') {
+          next.discount_percent = settings?.default_discount_percent ?? 20;
+        }
+
         if (value === 'Plot') {
           next.nirman = 'Plot';
           next.covered_area = 0;
@@ -341,9 +348,9 @@ export default function FastEntryForm({
           updated.push({
             id: nextId,
             name: nextName,
-            length: gf.length || '',
-            width: gf.width || '',
-            area: Number(gf.area) || 0
+            length: '',
+            width: '',
+            area: ''
           });
         }
       }
@@ -374,9 +381,9 @@ export default function FastEntryForm({
       const newFloor = {
         id: nextId,
         name: nextName,
-        length: gf.length || '',
-        width: gf.width || '',
-        area: Number(gf.area) || 0
+        length: '',
+        width: '',
+        area: ''
       };
 
       const updated = [...currentFloors, newFloor];
@@ -526,6 +533,11 @@ export default function FastEntryForm({
 
   // Live Calculations
   const isPlot = (formData.house_type || '').trim().toLowerCase() === 'plot';
+  const houseTypeLower = (formData.house_type || 'Residential').trim().toLowerCase();
+  const isCommercial = houseTypeLower === 'commercial';
+  const isGovt = houseTypeLower === 'government';
+  const isNoDiscount = isCommercial || isGovt;
+
   const totalArea = Math.max(0, Number(formData.total_area) || 0);
   const coveredArea = isPlot ? 0 : Math.max(0, Number(formData.covered_area) || 0);
   const businessArea = isPlot ? 0 : Math.max(0, Number(formData.business_area) || 0);
@@ -535,17 +547,17 @@ export default function FastEntryForm({
   const houseRate = Number(formData.house_tax_rate) || 0.40;
   const plotRate = Number(formData.plot_tax_rate) || 0.10;
   const comRate = Number(formData.commercial_tax_rate) || 1.00;
-  const discountPct = Number(formData.discount_percent ?? 20);
+  const discountPct = isNoDiscount ? 0 : Number(formData.discount_percent ?? 20);
   const taxPct = Number(formData.tax_percent ?? 10);
 
-  const discountMultiplier = Math.max(0, 1 - (discountPct / 100)); // Statutory 80% taxable base multiplier
+  const discountMultiplier = isNoDiscount ? 1 : Math.max(0, 1 - (discountPct / 100)); // 1.0 for Commercial/Govt (100% taxable), 0.80 for Residential
   const resArea = Math.max(0, coveredArea - businessArea);
 
-  // 80% Rule on Covered Area / Plot Area:
-  // Tax is assessed on 80% of taxable area
-  const taxableResArea = Math.round(resArea * discountMultiplier);
-  const taxableBusinessArea = Math.round(businessArea * discountMultiplier);
-  const taxablePlotArea = Math.round(plotArea * discountMultiplier);
+  // When Commercial or Government: 100% of area is assessed for tax (no discount).
+  // When Residential: 80% statutory rule applies (or user-defined discount).
+  const taxableResArea = isNoDiscount ? resArea : Math.round(resArea * discountMultiplier);
+  const taxableBusinessArea = (isNoDiscount || houseTypeLower === 'mixed') ? businessArea : Math.round(businessArea * discountMultiplier);
+  const taxablePlotArea = isNoDiscount ? plotArea : Math.round(plotArea * discountMultiplier);
 
   const resMonthly = taxableResArea * houseRate;
   const comMonthly = taxableBusinessArea * comRate;
@@ -557,7 +569,7 @@ export default function FastEntryForm({
   const comARV = isPlot ? 0 : Math.round(taxableBusinessArea * comRate * 12);
   const plotARV = Math.round(taxablePlotArea * plotRate * 12);
   const netARV = isPlot ? plotARV : (resARV + comARV + plotARV);
-  const discountAmt = Math.max(0, ((resArea * houseRate + businessArea * comRate + plotArea * plotRate) * 12) - netARV);
+  const discountAmt = isNoDiscount ? 0 : Math.max(0, ((resArea * houseRate + businessArea * comRate + plotArea * plotRate) * 12) - netARV);
 
   // House Tax calculation based on property type:
   // Residential: 10% (1x)
@@ -565,8 +577,6 @@ export default function FastEntryForm({
   // Government: 30% (तीन गुना - 3x)
   // Mixed: Residential 10% + Commercial 20%
   // Plot: 10% (प्लॉट टैक्स)
-  const houseTypeLower = (formData.house_type || 'Residential').trim().toLowerCase();
-  
   let resTax = 0;
   let comTax = 0;
   let plotTax = Math.round(plotARV * (taxPct / 100));
@@ -746,7 +756,7 @@ export default function FastEntryForm({
           business_area: 0,
           plot_area: '',
           floors_count: prev.house_type === 'Plot' ? 0 : 1,
-          floors: prev.house_type === 'Plot' ? [] : [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: 0 }]
+          floors: prev.house_type === 'Plot' ? [] : [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: '' }]
         }));
 
         // Focus owner name for lightning-fast next entry
@@ -794,14 +804,16 @@ export default function FastEntryForm({
                   mobile: '',
                   total_length: '',
                   total_width: '',
-                  total_area: 600,
+                  total_area: '',
                   covered_length: '',
                   covered_width: '',
-                  covered_area: 600,
+                  covered_area: '',
+                  floors_count: 1,
+                  floors: [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: '' }],
                   business_length: '',
                   business_width: '',
                   business_area: 0,
-                  plot_area: 0
+                  plot_area: ''
                 }));
                 ownerNameInputRef.current?.focus();
               }}
@@ -972,12 +984,12 @@ export default function FastEntryForm({
               </select>
               {formData.house_type === 'Commercial' && (
                 <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600, marginTop: 4 }}>
-                  ⚡ व्यावसायिक संपत्ति: नियमानुसार गृहकर दर सामान्य से दोगुनी (20%) लागू होगी।
+                  ⚡ व्यावसायिक संपत्ति: 100% क्षेत्रफल पर कर लागू (कोई 80% छूट नहीं) एवं गृहकर दर दोगुनी (20%) होगी।
                 </div>
               )}
               {formData.house_type === 'Government' && (
                 <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600, marginTop: 4 }}>
-                  🏛️ सरकारी संपत्ति: नियमानुसार गृहकर दर सामान्य से तीन गुनी (30%) लागू होगी।
+                  🏛️ सरकारी संपत्ति: 100% क्षेत्रफल पर कर लागू (कोई 80% छूट नहीं) एवं गृहकर दर तीन गुनी (30%) होगी।
                 </div>
               )}
               {formData.house_type === 'Mixed' && (
@@ -1132,15 +1144,30 @@ export default function FastEntryForm({
                       <span>2. कवर्ड एरिया (Covered Area)</span>
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-xs"
-                        onClick={handle80Percent}
-                        style={{ padding: '2px 8px', fontSize: '0.72rem', borderColor: '#10b981', color: '#059669' }}
-                        title="कुल क्षेत्रफल का 80% कवर्ड सेट करें"
-                      >
-                        ⚡ 80% भरें
-                      </button>
+                      {!isNoDiscount ? (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-xs"
+                          onClick={handle80Percent}
+                          style={{ padding: '2px 8px', fontSize: '0.72rem', borderColor: '#10b981', color: '#059669' }}
+                          title="कुल क्षेत्रफल का 80% कवर्ड सेट करें"
+                        >
+                          ⚡ 80% भरें
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-xs"
+                          onClick={() => {
+                            const tot = Math.max(0, Number(formData.total_area) || 0);
+                            handleChange('covered_area', tot);
+                          }}
+                          style={{ padding: '2px 8px', fontSize: '0.72rem', borderColor: '#b45309', color: '#b45309' }}
+                          title="कुल क्षेत्रफल का 100% कवर्ड सेट करें"
+                        >
+                          ⚡ 100% भरें
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-outline btn-xs"
@@ -1326,10 +1353,17 @@ export default function FastEntryForm({
                         जोड़: {formData.floors.map((f, i) => `${f.name.split(' ')[0]}: ${f.area || 0}`).join(' + ')} = <strong>{coveredArea} sq.ft.</strong>
                       </div>
                     )}
-                    <div style={{ fontSize: '0.73rem', color: '#059669', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
-                      <span>🏛️ 80% कर योग्य नियम: <strong>{taxableResArea + taxableBusinessArea} sq.ft.</strong> पर टैक्स लागू</span>
-                      <span>(20% नियमानुसार छूट)</span>
-                    </div>
+                    {isNoDiscount ? (
+                      <div style={{ fontSize: '0.73rem', color: '#b45309', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
+                        <span>🏛️ 100% कर योग्य नियम: <strong>{coveredArea} sq.ft.</strong> पर टैक्स लागू</span>
+                        <span>({formData.house_type === 'Commercial' ? 'व्यावसायिक' : 'सरकारी'} - कोई छूट नहीं)</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.73rem', color: '#059669', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
+                        <span>🏛️ 80% कर योग्य नियम: <strong>{taxableResArea + taxableBusinessArea} sq.ft.</strong> पर टैक्स लागू</span>
+                        <span>(20% नियमानुसार छूट)</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1679,19 +1713,33 @@ export default function FastEntryForm({
               </div>
 
               <div className="form-group">
-                <label className="form-label">छूट प्रतिशत (Discount %)</label>
+                <label className="form-label">
+                  छूट प्रतिशत (Discount %)
+                  {isNoDiscount && (
+                    <span style={{ fontSize: '0.72rem', color: '#dc2626', marginLeft: 6, fontWeight: 600 }}>
+                      (लागू नहीं - 0%)
+                    </span>
+                  )}
+                </label>
                 <select
                   className="form-control"
-                  value={formData.discount_percent}
+                  value={isNoDiscount ? 0 : formData.discount_percent}
                   onChange={(e) => handleChange('discount_percent', Number(e.target.value))}
+                  disabled={isNoDiscount}
+                  style={isNoDiscount ? { backgroundColor: 'var(--bg-subtle)', opacity: 0.85 } : {}}
                 >
-                  <option value={0}>0% (कोई छूट नहीं)</option>
+                  <option value={0}>0% (कोई छूट नहीं - 100% कर योग्य)</option>
                   <option value={5}>5% छूट</option>
                   <option value={10}>10% छूट</option>
                   <option value={15}>15% छूट</option>
                   <option value={20}>20% छूट (मानक नियमानुसार)</option>
                   <option value={25}>25% छूट</option>
                 </select>
+                {isNoDiscount && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 3 }}>
+                    व्यावसायिक व सरकारी संपत्तियों पर नियमानुसार 100% क्षेत्रफल पर कर लागू होता है।
+                  </div>
+                )}
               </div>
 
               <div className="form-group">
@@ -1759,10 +1807,14 @@ export default function FastEntryForm({
               ) : (
                 <>
                   <div className="calc-step-card">
-                    <div className="label">कर योग्य कवर्ड भाग (80%)</div>
-                    <div className="val" style={{ color: '#059669' }}>{taxableResArea + taxableBusinessArea} sq.ft.</div>
+                    <div className="label">
+                      {isNoDiscount ? 'कर योग्य कवर्ड भाग (100%)' : 'कर योग्य कवर्ड भाग (80%)'}
+                    </div>
+                    <div className="val" style={{ color: isNoDiscount ? '#b45309' : '#059669' }}>
+                      {taxableResArea + taxableBusinessArea} sq.ft.
+                    </div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                      कुल कवर्ड: {coveredArea} sq.ft.
+                      {isNoDiscount ? '100% कर योग्य (कोई छूट नहीं)' : `कुल कवर्ड: ${coveredArea} sq.ft.`}
                     </div>
                   </div>
 
@@ -1770,7 +1822,7 @@ export default function FastEntryForm({
                     <div className="label">मासिक आधार किराया (Monthly Base)</div>
                     <div className="val">₹{grossMonthly.toLocaleString('en-IN', { maximumFractionDigits: 1 })}</div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                      80% कर योग्य एरिया × दर
+                      {isNoDiscount ? '100% कर योग्य एरिया × दर' : '80% कर योग्य एरिया × दर'}
                     </div>
                   </div>
 
