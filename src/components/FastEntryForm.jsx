@@ -112,7 +112,7 @@ export default function FastEntryForm({
         floors: editingRecord.floors_data && editingRecord.floors_data.length > 0
           ? editingRecord.floors_data.map((f, i) => ({
               id: f.id || (i + 1),
-              name: f.name || f.floor_name || (i === 0 ? 'भूतल (Ground Floor)' : `${i + 1}वीं मंजिल`),
+              name: f.name || f.floor_name || (i === 0 ? 'भूतल (Ground Floor)' : (floorNameTemplates[i] || `मंजिल ${i}`)),
               length: f.length || '',
               width: f.width || '',
               area: Number(f.area) || 0
@@ -339,11 +339,11 @@ export default function FastEntryForm({
   // Floor templates for multi-story buildings (मंजिल)
   const floorNameTemplates = [
     'भूतल (Ground Floor)',
-    'प्रथम तल (1st Floor)',
-    'द्वितीय तल (2nd Floor)',
-    'तृतीय तल (3rd Floor)',
-    'चतुर्थ तल (4th Floor)',
-    'पंचम तल (5th Floor)'
+    'मंजिल 1 (1st Floor)',
+    'मंजिल 2 (2nd Floor)',
+    'मंजिल 3 (3rd Floor)',
+    'मंजिल 4 (4th Floor)',
+    'मंजिल 5 (5th Floor)'
   ];
 
   const handleSetFloorCount = (count) => {
@@ -362,7 +362,7 @@ export default function FastEntryForm({
         updated = [...currentFloors];
         for (let i = currentFloors.length; i < targetCount; i++) {
           const nextId = i + 1;
-          const nextName = floorNameTemplates[i] || `${nextId}वीं मंजिल`;
+          const nextName = floorNameTemplates[i] || `मंजिल ${i}`;
           updated.push({
             id: nextId,
             name: nextName,
@@ -394,7 +394,7 @@ export default function FastEntryForm({
         ? prev.floors.map(f => ({ ...f }))
         : [{ id: 1, name: 'भूतल (Ground Floor)', length: prev.covered_length || '', width: prev.covered_width || '', area: Number(prev.covered_area) || 0 }];
       const nextId = currentFloors.length + 1;
-      const nextName = floorNameTemplates[currentFloors.length] || `${nextId}वीं मंजिल`;
+      const nextName = floorNameTemplates[currentFloors.length] || `मंजिल ${currentFloors.length}`;
       const gf = currentFloors[0] || {};
 
       const newFloor = {
@@ -1274,13 +1274,19 @@ export default function FastEntryForm({
                         <span>मंजिलों की संख्या:</span>
                       </span>
                       <div style={{ display: 'inline-flex', borderRadius: 4, overflow: 'hidden', border: '1px solid #cbd5e1' }}>
-                        {[1, 2, 3, 4].map(num => {
-                          const active = (formData.floors?.length || 1) === num;
+                        {[
+                          { count: 1, label: 'भूतल' },
+                          { count: 2, label: 'मंजिल 1' },
+                          { count: 3, label: 'मंजिल 2' },
+                          { count: 4, label: 'मंजिल 3' },
+                          { count: 5, label: 'मंजिल 4' }
+                        ].map((opt, idx, arr) => {
+                          const active = (formData.floors?.length || 1) === opt.count;
                           return (
                             <button
-                              key={num}
+                              key={opt.count}
                               type="button"
-                              onClick={() => handleSetFloorCount(num)}
+                              onClick={() => handleSetFloorCount(opt.count)}
                               style={{
                                 padding: '2px 9px',
                                 fontSize: '0.72rem',
@@ -1289,11 +1295,11 @@ export default function FastEntryForm({
                                 color: active ? '#fff' : '#334155',
                                 border: 'none',
                                 cursor: 'pointer',
-                                borderRight: num < 4 ? '1px solid #cbd5e1' : 'none',
+                                borderRight: idx < arr.length - 1 ? '1px solid #cbd5e1' : 'none',
                                 transition: 'all 0.15s ease'
                               }}
                             >
-                              {num === 1 ? '1 मंजिल' : `${num} मंजिल`}
+                              {opt.label}
                             </button>
                           );
                         })}
@@ -1301,7 +1307,7 @@ export default function FastEntryForm({
                     </div>
                     {(formData.floors?.length || 1) > 1 && (
                       <span className="badge-auto" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '0.72rem' }}>
-                        बहुमंजिला ({formData.floors.length} मंजिलें)
+                        बहुमंजिला (भूतल + {formData.floors.length - 1} मंजिल)
                       </span>
                     )}
                   </div>
@@ -1321,7 +1327,7 @@ export default function FastEntryForm({
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: idx === 0 ? '#1e293b' : '#15803d', display: 'flex', alignItems: 'center', gap: 5 }}>
                             <span>🏢</span>
-                            <span>{floor.name || `${idx + 1}वीं मंजिल`}</span>
+                            <span>{floor.name || (idx === 0 ? 'भूतल (Ground Floor)' : `मंजिल ${idx}`)}</span>
                           </span>
                           <div style={{ display: 'flex', gap: 4 }}>
                             {idx > 0 && (
@@ -1379,7 +1385,7 @@ export default function FastEntryForm({
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                             <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>
-                              {idx === 0 ? 'भूतल क्षेत्रफल (वर्ग फुट)' : `${floor.name} क्षेत्रफल (वर्ग फुट)`}
+                              {idx === 0 ? 'भूतल क्षेत्रफल (वर्ग फुट)' : `${(floor.name || `मंजिल ${idx}`).split(' (')[0]} क्षेत्रफल (वर्ग फुट)`}
                             </span>
                             {floor.length > 0 && floor.width > 0 && (
                               <span style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: 600 }}>
@@ -1427,7 +1433,7 @@ export default function FastEntryForm({
                     </div>
                     {formData.floors && formData.floors.length > 1 && (
                       <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: 4 }}>
-                        जोड़: {formData.floors.map((f, i) => `${f.name.split(' ')[0]}: ${f.area || 0}`).join(' + ')} = <strong>{coveredArea} sq.ft.</strong>
+                        जोड़: {formData.floors.map((f, i) => `${(f.name || (i === 0 ? 'भूतल' : `मंजिल ${i}`)).split(' (')[0]}: ${f.area || 0}`).join(' + ')} = <strong>{coveredArea} sq.ft.</strong>
                       </div>
                     )}
                     {isMixed ? (

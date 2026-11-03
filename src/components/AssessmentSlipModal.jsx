@@ -186,7 +186,7 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
               <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#475569' }}>
                 कुल प्लॉट: {totLength > 0 && totWidth > 0 ? `${totLength}′ × ${totWidth}′ = ` : ''}{totArea} sq.ft. | 
                 {property.floors_data && property.floors_data.length > 1 ? (
-                  <>मंजिल: {property.floors_data.length} मंजिलें ({property.floors_data.map(f => `${f.name?.split(' ')?.[0] || 'तल'}: ${f.area}`).join(' + ')}) | कुल कवर्ड: {covArea} sq.ft.</>
+                  <>मंजिल: {property.floors_data.length} मंजिलें ({property.floors_data.map(f => `${f.name?.split(' (')?.[0] || f.name?.split(' ')?.[0] || 'तल'}: ${f.area}`).join(' + ')}) | कुल कवर्ड: {covArea} sq.ft.</>
                 ) : (
                   <>कवर्ड: {covLength > 0 && covWidth > 0 ? `${covLength}′ × ${covWidth}′ = ` : ''}{covArea} sq.ft.</>
                 )}
