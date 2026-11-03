@@ -582,6 +582,7 @@ export default function FastEntryForm({
 
   const totalArea = Math.max(0, Number(formData.total_area) || 0);
   const coveredArea = isPlot ? 0 : Math.max(0, Number(formData.covered_area) || 0);
+  const resArea = coveredArea;
   const businessArea = isPlot ? 0 : Math.max(0, Number(formData.business_area) || 0);
   const groundFloorArea = isPlot ? 0 : (Number(formData.floors?.[0]?.area) || coveredArea);
 
@@ -636,7 +637,7 @@ export default function FastEntryForm({
   const comARV = isPlot ? 0 : Math.round(taxableBusinessArea * comRate * 12);
   const plotARV = Math.round(taxablePlotArea * plotRate * 12);
   const netARV = isPlot ? plotARV : (resARV + comARV + plotARV);
-  const discountAmt = isNoDiscount ? 0 : Math.max(0, ((resArea * houseRate + businessArea * comRate + plotArea * plotRate) * 12) - netARV);
+  const discountAmt = isNoDiscount ? 0 : Math.max(0, ((coveredArea * houseRate + businessArea * comRate + plotArea * plotRate) * 12) - netARV);
 
   // House Tax calculation based on property type:
   // Residential: 10% (1x)
