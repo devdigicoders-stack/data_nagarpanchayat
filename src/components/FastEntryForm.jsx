@@ -232,7 +232,8 @@ export default function FastEntryForm({
             }
           }
           const gfArea = Number(next.floors?.[0]?.area) || tot;
-          next.plot_area = Math.max(0, tot - gfArea);
+          const bArea = prev.house_type === 'Mixed' ? (Number(next.business_area) || 0) : 0;
+          next.plot_area = Math.max(0, tot - (gfArea + bArea));
         }
       }
 
@@ -244,8 +245,18 @@ export default function FastEntryForm({
           currentFloors[0] = { ...currentFloors[0], area: cov };
         }
         const gfArea = Number(currentFloors[0]?.area) || cov;
+        const bArea = prev.house_type === 'Mixed' ? (Number(prev.business_area) || 0) : 0;
         next.floors = currentFloors;
-        next.plot_area = Math.max(0, tot - gfArea);
+        next.plot_area = Math.max(0, tot - (gfArea + bArea));
+      }
+
+      if (field === 'business_area') {
+        const tot = Math.max(0, Number(prev.total_area) || 0);
+        const gfArea = Number(prev.floors?.[0]?.area) || (Number(prev.covered_area) || 0);
+        const bArea = Math.max(0, Number(value) || 0);
+        if (prev.house_type === 'Mixed') {
+          next.plot_area = Math.max(0, tot - (gfArea + bArea));
+        }
       }
 
       if (field === 'house_type') {
@@ -317,7 +328,8 @@ export default function FastEntryForm({
             }
           }
           const gfArea = Number(next.floors?.[0]?.area) || (Number(next.covered_area) || 0);
-          next.plot_area = Math.max(0, calcArea - gfArea);
+          const bArea = prev.house_type === 'Mixed' ? (Number(next.business_area) || 0) : 0;
+          next.plot_area = Math.max(0, calcArea - (gfArea + bArea));
         }
       }
       return next;
@@ -365,12 +377,13 @@ export default function FastEntryForm({
       const gfArea = Number(updated[0]?.area) || 0;
       const totArea = Number(prev.total_area) || 0;
 
+      const bArea = prev.house_type === 'Mixed' ? (Number(prev.business_area) || 0) : 0;
       return {
         ...prev,
         floors_count: targetCount,
         floors: updated,
         covered_area: newCoveredArea,
-        plot_area: Math.max(0, totArea - gfArea)
+        plot_area: Math.max(0, totArea - (gfArea + bArea))
       };
     });
   };
@@ -396,13 +409,14 @@ export default function FastEntryForm({
       const newCoveredArea = updated.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
       const gfArea = Number(updated[0]?.area) || 0;
       const totArea = Number(prev.total_area) || 0;
+      const bArea = prev.house_type === 'Mixed' ? (Number(prev.business_area) || 0) : 0;
 
       return {
         ...prev,
         floors_count: updated.length,
         floors: updated,
         covered_area: newCoveredArea,
-        plot_area: Math.max(0, totArea - gfArea)
+        plot_area: Math.max(0, totArea - (gfArea + bArea))
       };
     });
   };
@@ -415,13 +429,14 @@ export default function FastEntryForm({
       const newCoveredArea = updated.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
       const gfArea = Number(updated[0]?.area) || 0;
       const totArea = Number(prev.total_area) || 0;
+      const bArea = prev.house_type === 'Mixed' ? (Number(prev.business_area) || 0) : 0;
 
       return {
         ...prev,
         floors_count: updated.length,
         floors: updated,
         covered_area: newCoveredArea,
-        plot_area: Math.max(0, totArea - gfArea)
+        plot_area: Math.max(0, totArea - (gfArea + bArea))
       };
     });
   };
@@ -445,12 +460,13 @@ export default function FastEntryForm({
       const newCoveredArea = currentFloors.reduce((sum, f) => sum + (Number(f.area) || 0), 0);
       const gfArea = Number(currentFloors[0]?.area) || 0;
       const totArea = Number(prev.total_area) || 0;
+      const bArea = prev.house_type === 'Mixed' ? (Number(prev.business_area) || 0) : 0;
 
       const next = {
         ...prev,
         floors: currentFloors,
         covered_area: newCoveredArea,
-        plot_area: Math.max(0, totArea - gfArea)
+        plot_area: Math.max(0, totArea - (gfArea + bArea))
       };
 
       if (index === 0) {
@@ -496,6 +512,11 @@ export default function FastEntryForm({
       if (l > 0 && w > 0) {
         const calcArea = Math.round(l * w);
         next.business_area = calcArea;
+        if (prev.house_type === 'Mixed') {
+          const tot = Math.max(0, Number(prev.total_area) || 0);
+          const gfArea = Number(prev.floors?.[0]?.area) || (Number(prev.covered_area) || 0);
+          next.plot_area = Math.max(0, tot - (gfArea + calcArea));
+        }
       }
       return next;
     });
@@ -557,12 +578,23 @@ export default function FastEntryForm({
   const isCommercial = houseTypeLower === 'commercial';
   const isGovt = houseTypeLower === 'government';
   const isNoDiscount = isCommercial || isGovt;
+  const isMixed = houseTypeLower === 'mixed';
 
   const totalArea = Math.max(0, Number(formData.total_area) || 0);
   const coveredArea = isPlot ? 0 : Math.max(0, Number(formData.covered_area) || 0);
   const businessArea = isPlot ? 0 : Math.max(0, Number(formData.business_area) || 0);
-  const plotArea = isPlot ? totalArea : Math.max(0, Number(formData.plot_area) || 0);
   const groundFloorArea = isPlot ? 0 : (Number(formData.floors?.[0]?.area) || coveredArea);
+
+  // In Mixed: both residential ground floor and shop are constructed on the plot
+  const totalGroundConstructed = isMixed ? (groundFloorArea + businessArea) : groundFloorArea;
+  const defaultPlotArea = Math.max(0, totalArea - totalGroundConstructed);
+  const hasCustomPlotDims = Number(formData.plot_length) > 0 && Number(formData.plot_width) > 0;
+
+  const plotArea = isPlot 
+    ? totalArea 
+    : (hasCustomPlotDims 
+        ? Math.max(0, Number(formData.plot_area) || 0) 
+        : defaultPlotArea);
 
   const houseRate = Number(formData.house_tax_rate) || 0.40;
   const plotRate = Number(formData.plot_tax_rate) || 0.10;
@@ -571,12 +603,10 @@ export default function FastEntryForm({
   const taxPct = Number(formData.tax_percent ?? 10);
 
   const discountMultiplier = isNoDiscount ? 1 : Math.max(0, 1 - (discountPct / 100)); // 1.0 for Commercial/Govt (100% taxable), 0.80 for Residential
-  const resArea = Math.max(0, coveredArea - businessArea);
 
   // When Commercial or Government: 100% of area is assessed for tax (no discount).
-  // When Mixed: statutory 80% base of covered area. The shop (business area) is within this 80% base, and the rest is residential.
+  // When Mixed: Residential house (e.g. 225) gets 80% rule, and Shop (e.g. 150) gets 100%
   // When Residential: 80% statutory rule applies (or user-defined discount).
-  const taxableCoveredBase = isNoDiscount ? coveredArea : Math.round(coveredArea * discountMultiplier);
   let taxableResArea = 0;
   let taxableBusinessArea = 0;
 
@@ -585,13 +615,13 @@ export default function FastEntryForm({
     taxableBusinessArea = 0;
   } else if (isNoDiscount) {
     taxableBusinessArea = businessArea;
-    taxableResArea = Math.max(0, coveredArea - businessArea);
-  } else if (houseTypeLower === 'mixed') {
+    taxableResArea = coveredArea;
+  } else if (isMixed) {
+    taxableResArea = Math.round(coveredArea * discountMultiplier);
     taxableBusinessArea = businessArea;
-    taxableResArea = Math.max(0, taxableCoveredBase - businessArea);
   } else {
     taxableBusinessArea = 0;
-    taxableResArea = Math.round(resArea * discountMultiplier);
+    taxableResArea = Math.round(coveredArea * discountMultiplier);
   }
 
   const taxablePlotArea = isNoDiscount ? plotArea : Math.round(plotArea * discountMultiplier);
@@ -724,7 +754,8 @@ export default function FastEntryForm({
       total_area: totalArea,
       covered_length: isPlotSubmission ? 0 : (Number(floorsList[0]?.length || formData.covered_length) || 0),
       covered_width: isPlotSubmission ? 0 : (Number(floorsList[0]?.width || formData.covered_width) || 0),
-      covered_area: effectiveCoveredArea,
+      covered_area: formData.house_type === 'Mixed' ? (coveredArea + effectiveBusinessArea) : effectiveCoveredArea,
+      res_covered_area: coveredArea,
       floors_count: isPlotSubmission ? 0 : floorsList.length,
       floors_data: floorsList,
       business_length: isPlotSubmission ? 0 : (Number(formData.business_length) || 0),
@@ -1184,7 +1215,7 @@ export default function FastEntryForm({
                   <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#059669', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Building2 size={16} />
-                      <span>2. कवर्ड एरिया (Covered Area)</span>
+                      <span>{isMixed ? '2. आवासीय कवर्ड एरिया (Residential Covered Area)' : '2. कवर्ड एरिया (Covered Area)'}</span>
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {!isNoDiscount ? (
@@ -1383,9 +1414,11 @@ export default function FastEntryForm({
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534' }}>
-                        {formData.floors && formData.floors.length > 1 
-                          ? `🏢 कुल कवर्ड क्षेत्रफल (${formData.floors.length} मंजिलों का योग):` 
-                          : 'कुल कवर्ड क्षेत्रफल:'}
+                        {isMixed 
+                          ? '🏠 कुल आवासीय कवर्ड क्षेत्रफल:' 
+                          : (formData.floors && formData.floors.length > 1 
+                              ? `🏢 कुल कवर्ड क्षेत्रफल (${formData.floors.length} मंजिलों का योग):` 
+                              : 'कुल कवर्ड क्षेत्रफल:')}
                       </span>
                       <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#059669' }}>
                         {coveredArea} वर्ग फुट
@@ -1396,7 +1429,12 @@ export default function FastEntryForm({
                         जोड़: {formData.floors.map((f, i) => `${f.name.split(' ')[0]}: ${f.area || 0}`).join(' + ')} = <strong>{coveredArea} sq.ft.</strong>
                       </div>
                     )}
-                    {isNoDiscount ? (
+                    {isMixed ? (
+                      <div style={{ fontSize: '0.73rem', color: '#059669', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600, flexWrap: 'wrap', gap: 4 }}>
+                        <span>🏛️ कुल निर्मित: <strong>{coveredArea + businessArea} sq.ft.</strong> ({coveredArea} आवास + {businessArea} दुकान)</span>
+                        <span>कर योग्य: {taxableResArea} आवास (80%) + {taxableBusinessArea} दुकान (100%)</span>
+                      </div>
+                    ) : isNoDiscount ? (
                       <div style={{ fontSize: '0.73rem', color: '#b45309', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
                         <span>🏛️ 100% कर योग्य नियम: <strong>{coveredArea} sq.ft.</strong> पर टैक्स लागू</span>
                         <span>({formData.house_type === 'Commercial' ? 'व्यावसायिक' : 'सरकारी'} - कोई छूट नहीं)</span>
@@ -1474,6 +1512,8 @@ export default function FastEntryForm({
                   <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', background: 'var(--bg-subtle)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
                     {formData.plot_length > 0 && formData.plot_width > 0 ? (
                       <>📐 <strong>आयाम सूत्र:</strong> {formData.plot_length} फीट × {formData.plot_width} फीट = <strong>{plotArea} वर्ग फुट</strong> खुला क्षेत्र</>
+                    ) : isMixed ? (
+                      <>💡 <strong>स्वतः सूत्र:</strong> {totalArea} कुल - {groundFloorArea + businessArea} कुल निर्मित ({groundFloorArea} आवास + {businessArea} दुकान) = <strong>{plotArea} वर्ग फुट</strong> खुला प्लॉट</>
                     ) : formData.floors && formData.floors.length > 1 ? (
                       <>💡 <strong>स्वतः सूत्र:</strong> {totalArea} कुल प्लॉट - {groundFloorArea} भूतल = <strong>{plotArea} वर्ग फुट</strong> खुला प्लॉट (बहुमंजिला)</>
                     ) : (
@@ -1575,22 +1615,22 @@ export default function FastEntryForm({
                     </div>
                   </div>
 
-                  {/* Residential Portion (Auto-Calculated) */}
+                  {/* Residential Portion */}
                   <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
                     <label className="form-label" style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
                       <span>🏠 रिहायशी आवास भाग</span>
-                      <span style={{ fontSize: '0.72rem', color: '#2563eb' }}>स्वतः शेष (80% में से)</span>
+                      <span style={{ fontSize: '0.72rem', color: '#2563eb' }}>80% कर योग्य</span>
                     </label>
                     <div style={{ padding: '8px 10px', background: '#eff6ff', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                       <span style={{ fontWeight: 800, fontSize: '1.15rem', color: '#1e3a8a' }}>
-                        {taxableResArea} वर्ग फुट
+                        {coveredArea} वर्ग फुट
                       </span>
                       <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 600 }}>
-                        (80% कवर्ड {taxableCoveredBase} - {businessArea} दुकान)
+                        (80% कर योग्य: {taxableResArea} sq.ft.)
                       </span>
                     </div>
                     <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: 5, lineHeight: 1.4 }}>
-                      स्वतः शेष: 80% कवर्ड ({taxableCoveredBase} sq.ft.) - दुकान ({businessArea} sq.ft.) = <strong>{taxableResArea} sq.ft.</strong> आवास • दर: ₹{houseRate}/sqft • मासिक: ₹{resMonthly.toFixed(1)} • टैक्स: <strong style={{ color: '#1e40af' }}>₹{resTax}</strong>
+                      आवास: {coveredArea} sq.ft. का 80% = <strong>{taxableResArea} sq.ft.</strong> • दर: ₹{houseRate}/sqft • मासिक: ₹{resMonthly.toFixed(1)} • टैक्स: <strong style={{ color: '#1e40af' }}>₹{resTax}</strong>
                     </div>
                   </div>
 
