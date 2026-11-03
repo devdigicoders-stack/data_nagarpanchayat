@@ -72,7 +72,9 @@ export default function FastEntryForm({
     business_length: '',
     business_width: '',
     business_area: 0,
-    plot_area: 0,
+    plot_length: '',
+    plot_width: '',
+    plot_area: '',
     house_tax_rate: 0.40,
     plot_tax_rate: 0.10,
     commercial_tax_rate: 1.00,
@@ -119,6 +121,8 @@ export default function FastEntryForm({
         business_length: editingRecord.business_length || '',
         business_width: editingRecord.business_width || '',
         business_area: Number(editingRecord.business_area) || 0,
+        plot_length: editingRecord.plot_length || '',
+        plot_width: editingRecord.plot_width || '',
         plot_area: Number(editingRecord.plot_area) || 0,
         house_tax_rate: Number(editingRecord.house_tax_rate) || 0.40,
         plot_tax_rate: Number(editingRecord.plot_tax_rate) || 0.10,
@@ -167,7 +171,9 @@ export default function FastEntryForm({
         business_length: '',
         business_width: '',
         business_area: 0,
-        plot_area: 0,
+        plot_length: '',
+        plot_width: '',
+        plot_area: '',
         house_tax_rate: getRateForNirman(settings?.sticky_nirman || 'Pakka', settings),
         plot_tax_rate: settings?.plot_rate || 0.10,
         commercial_tax_rate: settings?.commercial_rate || 1.00,
@@ -495,6 +501,20 @@ export default function FastEntryForm({
     });
   };
 
+  // Open Plot Area Dimension Handler (Length x Width)
+  const handlePlotDimChange = (dim, val) => {
+    setFormData(prev => {
+      const next = { ...prev, [dim]: val };
+      const l = Number(dim === 'plot_length' ? val : prev.plot_length);
+      const w = Number(dim === 'plot_width' ? val : prev.plot_width);
+      if (l > 0 && w > 0) {
+        const calcArea = Math.round(l * w);
+        next.plot_area = calcArea;
+      }
+      return next;
+    });
+  };
+
   const handleToggleSuffix = () => {
     setFormData(prev => {
       const val = (prev.property_id || '').trim();
@@ -554,9 +574,26 @@ export default function FastEntryForm({
   const resArea = Math.max(0, coveredArea - businessArea);
 
   // When Commercial or Government: 100% of area is assessed for tax (no discount).
+  // When Mixed: statutory 80% base of covered area. The shop (business area) is within this 80% base, and the rest is residential.
   // When Residential: 80% statutory rule applies (or user-defined discount).
-  const taxableResArea = isNoDiscount ? resArea : Math.round(resArea * discountMultiplier);
-  const taxableBusinessArea = (isNoDiscount || houseTypeLower === 'mixed') ? businessArea : Math.round(businessArea * discountMultiplier);
+  const taxableCoveredBase = isNoDiscount ? coveredArea : Math.round(coveredArea * discountMultiplier);
+  let taxableResArea = 0;
+  let taxableBusinessArea = 0;
+
+  if (isPlot) {
+    taxableResArea = 0;
+    taxableBusinessArea = 0;
+  } else if (isNoDiscount) {
+    taxableBusinessArea = businessArea;
+    taxableResArea = Math.max(0, coveredArea - businessArea);
+  } else if (houseTypeLower === 'mixed') {
+    taxableBusinessArea = businessArea;
+    taxableResArea = Math.max(0, taxableCoveredBase - businessArea);
+  } else {
+    taxableBusinessArea = 0;
+    taxableResArea = Math.round(resArea * discountMultiplier);
+  }
+
   const taxablePlotArea = isNoDiscount ? plotArea : Math.round(plotArea * discountMultiplier);
 
   const resMonthly = taxableResArea * houseRate;
@@ -693,6 +730,8 @@ export default function FastEntryForm({
       business_length: isPlotSubmission ? 0 : (Number(formData.business_length) || 0),
       business_width: isPlotSubmission ? 0 : (Number(formData.business_width) || 0),
       business_area: effectiveBusinessArea,
+      plot_length: isPlotSubmission ? 0 : (Number(formData.plot_length) || 0),
+      plot_width: isPlotSubmission ? 0 : (Number(formData.plot_width) || 0),
       plot_area: effectivePlotArea,
       total_arv: netARV,
       res_tax: resTax,
@@ -754,6 +793,8 @@ export default function FastEntryForm({
           business_length: '',
           business_width: '',
           business_area: 0,
+          plot_length: '',
+          plot_width: '',
           plot_area: '',
           floors_count: prev.house_type === 'Plot' ? 0 : 1,
           floors: prev.house_type === 'Plot' ? [] : [{ id: 1, name: 'भूतल (Ground Floor)', length: '', width: '', area: '' }]
@@ -813,6 +854,8 @@ export default function FastEntryForm({
                   business_length: '',
                   business_width: '',
                   business_area: 0,
+                  plot_length: '',
+                  plot_width: '',
                   plot_area: ''
                 }));
                 ownerNameInputRef.current?.focus();
@@ -1361,7 +1404,7 @@ export default function FastEntryForm({
                     ) : (
                       <div style={{ fontSize: '0.73rem', color: '#059669', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
                         <span>🏛️ 80% कर योग्य नियम: <strong>{taxableResArea + taxableBusinessArea} sq.ft.</strong> पर टैक्स लागू</span>
-                        <span>(20% नियमानुसार छूट)</span>
+                        <span>({houseTypeLower === 'mixed' && businessArea > 0 ? `${businessArea} sq.ft. दुकान + ${taxableResArea} sq.ft. आवास` : '20% नियमानुसार छूट'})</span>
                       </div>
                     )}
                   </div>
@@ -1371,12 +1414,49 @@ export default function FastEntryForm({
               {/* Plot Area / Open Ground Box - Only when NOT Plot */}
               {!isPlot && (
                 <div style={{ background: 'var(--bg-card)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#d97706', marginBottom: 8 }}>
-                    3. खुला / प्लॉट एरिया (Open Area)
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#d97706', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>3. खुला / प्लॉट एरिया (Open Area)</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                      लंबाई × चौड़ाई कैलकुलेटर
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.72rem' }}>लंबाई (फीट)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="उदा. 12"
+                        className="form-control"
+                        style={{ height: '32px', fontSize: '0.85rem' }}
+                        value={formData.plot_length || ''}
+                        onChange={(e) => handlePlotDimChange('plot_length', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.72rem' }}>चौड़ाई (फीट)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="उदा. 10"
+                        className="form-control"
+                        style={{ height: '32px', fontSize: '0.85rem' }}
+                        value={formData.plot_width || ''}
+                        onChange={(e) => handlePlotDimChange('plot_width', e.target.value)}
+                      />
+                    </div>
                   </div>
 
                   <div style={{ marginBottom: 12 }}>
-                    <label className="form-label" style={{ fontSize: '0.78rem' }}>रिक्त प्लॉट क्षेत्रफल (वर्ग फुट)</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <label className="form-label" style={{ fontSize: '0.78rem', margin: 0 }}>रिक्त प्लॉट क्षेत्रफल (वर्ग फुट)</label>
+                      {formData.plot_length > 0 && formData.plot_width > 0 && (
+                        <span className="badge-auto" style={{ background: '#fef3c7', color: '#92400e', fontSize: '0.7rem' }}>
+                          ✓ {formData.plot_length} × {formData.plot_width} = {plotArea} sq.ft.
+                        </span>
+                      )}
+                    </div>
                     <div className="input-group">
                       <input
                         type="number"
@@ -1392,7 +1472,9 @@ export default function FastEntryForm({
                   </div>
 
                   <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', background: 'var(--bg-subtle)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' }}>
-                    {formData.floors && formData.floors.length > 1 ? (
+                    {formData.plot_length > 0 && formData.plot_width > 0 ? (
+                      <>📐 <strong>आयाम सूत्र:</strong> {formData.plot_length} फीट × {formData.plot_width} फीट = <strong>{plotArea} वर्ग फुट</strong> खुला क्षेत्र</>
+                    ) : formData.floors && formData.floors.length > 1 ? (
                       <>💡 <strong>स्वतः सूत्र:</strong> {totalArea} कुल प्लॉट - {groundFloorArea} भूतल = <strong>{plotArea} वर्ग फुट</strong> खुला प्लॉट (बहुमंजिला)</>
                     ) : (
                       <>💡 <strong>स्वतः सूत्र:</strong> {totalArea} कुल - {coveredArea} कवर्ड = <strong>{plotArea} वर्ग फुट</strong> खुला प्लॉट</>
@@ -1486,7 +1568,7 @@ export default function FastEntryForm({
                     </div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
                       {businessArea > 0 ? (
-                        <>कवर्ड {businessArea} sq.ft. का 80% = <strong>{taxableBusinessArea} sq.ft. कर योग्य</strong> • दर: ₹{comRate}/sqft • टैक्स: <strong>₹{comTax}</strong></>
+                        <>व्यावसायिक <strong>{businessArea} sq.ft.</strong> • दर: ₹{comRate}/sqft • टैक्स (20% दोगुना): <strong>₹{comTax}</strong></>
                       ) : (
                         <>दर: ₹{comRate}/sqft • टैक्स: <strong>₹{comTax}</strong></>
                       )}
@@ -1497,18 +1579,18 @@ export default function FastEntryForm({
                   <div style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid #bfdbfe' }}>
                     <label className="form-label" style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
                       <span>🏠 रिहायशी आवास भाग</span>
-                      <span style={{ fontSize: '0.72rem', color: '#2563eb' }}>80% कर योग्य</span>
+                      <span style={{ fontSize: '0.72rem', color: '#2563eb' }}>स्वतः शेष (80% में से)</span>
                     </label>
                     <div style={{ padding: '8px 10px', background: '#eff6ff', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                       <span style={{ fontWeight: 800, fontSize: '1.15rem', color: '#1e3a8a' }}>
                         {taxableResArea} वर्ग फुट
                       </span>
                       <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 600 }}>
-                        (कुल कवर्ड {resArea} sq.ft. का 80%)
+                        (80% कवर्ड {taxableCoveredBase} - {businessArea} दुकान)
                       </span>
                     </div>
                     <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginTop: 5, lineHeight: 1.4 }}>
-                      स्वतः: कवर्ड {resArea} sq.ft. का 80% = <strong>{taxableResArea} sq.ft.</strong> • दर: ₹{houseRate}/sqft • मासिक: ₹{resMonthly.toFixed(1)} • टैक्स: <strong style={{ color: '#1e40af' }}>₹{resTax}</strong>
+                      स्वतः शेष: 80% कवर्ड ({taxableCoveredBase} sq.ft.) - दुकान ({businessArea} sq.ft.) = <strong>{taxableResArea} sq.ft.</strong> आवास • दर: ₹{houseRate}/sqft • मासिक: ₹{resMonthly.toFixed(1)} • टैक्स: <strong style={{ color: '#1e40af' }}>₹{resTax}</strong>
                     </div>
                   </div>
 
