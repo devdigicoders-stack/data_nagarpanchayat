@@ -139,15 +139,12 @@ export default function FastEntryForm({
       const wardPrefix = defaultWard?.id_prefix || settings?.id_prefix || '09037010010';
 
       const initialHouse = (nextIds && nextIds.ward_no === targetWardNo && nextIds.nextHouse) ? nextIds.nextHouse : '10001';
-      const initialPropId = (nextIds && nextIds.ward_no === targetWardNo && nextIds.nextPropId)
-        ? nextIds.nextPropId
-        : buildPropertyId(wardPrefix, initialHouse, houseType);
 
       setFormData(prev => ({
         ...prev,
         ward_no: targetWardNo,
         ward_name: targetWardName,
-        property_id: initialPropId,
+        property_id: '',
         house_no: initialHouse,
         sr_no: (nextIds && nextIds.ward_no === targetWardNo) ? nextIds.nextSr : 1,
         owner_name: '',
@@ -179,18 +176,18 @@ export default function FastEntryForm({
         sewer_tax_percent: 2.5
       }));
 
-      // Always fetch fresh ID for the target ward to ensure up-to-date prefix, sr_no and house_no
+      // Always fetch fresh sequence for the target ward to ensure up-to-date sr_no and house_no
       fetch(`/api/next-id?ward_no=${targetWardNo}&house_type=${houseType}&_t=${Date.now()}`)
         .then(r => r.json())
         .then(data => {
-          if (data.nextPropId) {
+          if (data) {
             setFormData(p => ({
               ...p,
               ward_no: targetWardNo,
               ward_name: targetWardName,
-              property_id: data.nextPropId,
-              house_no: data.nextHouse,
-              sr_no: data.nextSr
+              property_id: p.property_id || '',
+              house_no: data.nextHouse || p.house_no,
+              sr_no: data.nextSr || p.sr_no
             }));
           }
         })
@@ -204,12 +201,6 @@ export default function FastEntryForm({
 
       if (field === 'nirman') {
         next.house_tax_rate = getRateForNirman(value, settings);
-      }
-
-      if (field === 'house_no' && !editingRecord) {
-        const currentWard = (wards || []).find(w => w.ward_no === prev.ward_no);
-        const currentPrefix = currentWard?.id_prefix || settings?.id_prefix;
-        next.property_id = buildPropertyId(currentPrefix, value, prev.house_type);
       }
 
       if (field === 'total_area') {
@@ -244,11 +235,7 @@ export default function FastEntryForm({
 
       if (field === 'house_type') {
         const suffix = getSuffixForType(value);
-        if (!editingRecord) {
-          const currentWard = (wards || []).find(w => w.ward_no === prev.ward_no);
-          const currentPrefix = currentWard?.id_prefix || settings?.id_prefix;
-          next.property_id = buildPropertyId(currentPrefix, prev.house_no, value);
-        } else {
+        if (prev.property_id && prev.property_id.trim()) {
           if (/[A-Z]$/i.test(prev.property_id)) {
             next.property_id = prev.property_id.slice(0, -1) + suffix;
           } else {
@@ -490,8 +477,11 @@ export default function FastEntryForm({
 
   const handleToggleSuffix = () => {
     setFormData(prev => {
-      const val = prev.property_id.trim();
+      const val = (prev.property_id || '').trim();
       const currentSuffix = getSuffixForType(prev.house_type);
+      if (!val) {
+        return { ...prev, property_id: currentSuffix };
+      }
       let updated = val;
       if (val.endsWith(currentSuffix)) {
         updated = val.slice(0, -currentSuffix.length);
@@ -616,14 +606,11 @@ export default function FastEntryForm({
     
     localStorage.setItem('sticky_active_ward_no', String(num));
 
-    const tempPrefix = found?.id_prefix || settings?.id_prefix;
     setFormData(prev => ({
       ...prev,
       ward_no: num,
       ward_name: wName,
-      property_id: (!editingRecord && tempPrefix)
-        ? buildPropertyId(tempPrefix, prev.house_no, prev.house_type)
-        : prev.property_id
+      property_id: editingRecord ? prev.property_id : ''
     }));
 
     if (!editingRecord) {
@@ -635,7 +622,7 @@ export default function FastEntryForm({
             ...prev,
             ward_no: num,
             ward_name: wName,
-            property_id: data.nextPropId || prev.property_id,
+            property_id: prev.property_id || '',
             house_no: data.nextHouse || prev.house_no,
             sr_no: data.nextSr
           }));
@@ -650,6 +637,11 @@ export default function FastEntryForm({
   const handleSubmit = async (e, isSaveAndNext = false) => {
     if (e && e.preventDefault) e.preventDefault();
     if (isSubmitting) return;
+
+    if (!formData.property_id || !formData.property_id.trim()) {
+      alert('कृपया प्रॉपर्टी आईडी दर्ज करें।');
+      return;
+    }
 
     setIsSubmitting(true);
     localStorage.setItem('sticky_active_ward_no', String(formData.ward_no));
@@ -667,6 +659,7 @@ export default function FastEntryForm({
 
     const submissionData = {
       ...formData,
+      property_id: formData.property_id.trim(),
       nirman: isPlotSubmission ? 'Plot' : formData.nirman,
       total_length: Number(formData.total_length) || 0,
       total_width: Number(formData.total_width) || 0,
@@ -725,7 +718,7 @@ export default function FastEntryForm({
         // Reset fields for the next entry while preserving sticky settings
         setFormData(prev => ({
           ...prev,
-          property_id: newPropId,
+          property_id: '',
           house_no: newHouseNo,
           sr_no: newSrNo || ((Number(prev.sr_no) || 0) + 1),
           owner_name: '',
@@ -784,6 +777,7 @@ export default function FastEntryForm({
               onClick={() => {
                 setFormData(prev => ({
                   ...prev,
+                  property_id: '',
                   owner_name: '',
                   father_name: '',
                   mobile: '',
@@ -869,18 +863,18 @@ export default function FastEntryForm({
               )}
             </div>
 
-            {/* Property ID (16 Digits + 1 Letter = 17 Chars) */}
+            {/* Property ID */}
             <div className="form-group">
               <label className="form-label">
-                <span>प्रॉपर्टी आईडी (17 अक्षर: 16 अंक + श्रेणी कोड)</span>
-                <span className="badge-auto">17 Chars</span>
+                <span>प्रॉपर्टी आईडी (Property ID) *</span>
+                <span className="badge-auto">{formData.property_id ? `${formData.property_id.length} Chars` : 'खाली (Blank)'}</span>
               </label>
               <div className="input-group">
                 <input
                   type="text"
                   className="form-control"
                   value={formData.property_id}
-                  maxLength={17}
+                  placeholder="प्रॉपर्टी आईडी दर्ज करें (उदा. 09653...)"
                   onChange={(e) => handleChange('property_id', e.target.value)}
                   required
                 />
@@ -895,7 +889,7 @@ export default function FastEntryForm({
                 </button>
               </div>
               <div className="form-note">
-                16 अंक + '{getSuffixForType(formData.house_type)}' (R-आवास, C-कमर्शियल, M-मिक्स, P-प्लॉट, G-सरकारी)
+                (यहाँ जो प्रॉपर्टी आईडी भरेंगे, वही डेटाबेस में सुरक्षित होगी)
               </div>
             </div>
 
