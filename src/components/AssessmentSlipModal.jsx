@@ -216,7 +216,7 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                 </tr>
                 <tr>
                   <td>व्यावसायिक / दुकान भाग (Commercial)</td>
-                  <td>{busArea || (property.house_type?.toLowerCase() === 'commercial' ? covArea : 0)} sq.ft. (80% कर योग्य: {Math.round((busArea || (property.house_type?.toLowerCase() === 'commercial' ? covArea : 0)) * 0.8)} sq.ft.)</td>
+                  <td>{busArea || (property.house_type?.toLowerCase() === 'commercial' ? covArea : 0)} sq.ft. (100% कर योग्य)</td>
                   <td>₹{property.commercial_tax_rate || '1.00'}/माह</td>
                   <td>₹{Math.round(comTax * 5).toLocaleString('en-IN')}</td>
                   <td>20% (दोगुना)</td>
@@ -233,7 +233,15 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                 <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
                   <td>मूल गृहकर योग (House Tax)</td>
                   <td>{totArea} वर्ग फुट</td>
-                  <td>(कवर्ड एरिया के 80% भाग पर कर निर्धारण)</td>
+                  <td>
+                    {property.house_type?.toLowerCase() === 'commercial' 
+                      ? '(100% क्षेत्रफल पर कर निर्धारण)' 
+                      : property.house_type?.toLowerCase() === 'government' 
+                        ? '(100% क्षेत्रफल पर कर निर्धारण)' 
+                        : property.house_type?.toLowerCase() === 'mixed' 
+                          ? '(आवास 80% + दुकान 100% पर कर निर्धारण)' 
+                          : '(कवर्ड एरिया के 80% भाग पर कर निर्धारण)'}
+                  </td>
                   <td>₹{totalARV.toLocaleString('en-IN')}</td>
                   <td>{property.house_type?.toLowerCase() === 'commercial' ? '20% (दोगुना)' : property.house_type?.toLowerCase() === 'government' ? '30% (तीन गुना)' : property.house_type?.toLowerCase() === 'mixed' ? 'मिश्रित दर' : '10%'}</td>
                   <td style={{ color: '#0369a1' }}>₹{houseTax.toLocaleString('en-IN')}</td>
