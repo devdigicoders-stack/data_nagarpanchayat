@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Save, RotateCcw, Zap, ArrowRightCircle, PlusCircle, CheckCircle2, Building2, Layers } from 'lucide-react';
 
+export const parseHouseNo = (houseNo) => {
+  const raw = String(houseNo || '').trim().toUpperCase();
+  const match = raw.match(/^(\d+)(?:[\/\-\s_]?([A-Z0-9]+))?$/i);
+  if (match) {
+    return {
+      num: match[1],
+      sub: match[2] || ''
+    };
+  }
+  const num = raw.replace(/\D/g, '') || '10001';
+  const sub = raw.replace(/^[^A-Z0-9]*/i, '').replace(/^\d+/, '').replace(/[\/\-\s_]/g, '');
+  return { num, sub };
+};
+
 export const buildPropertyId = (prefix, houseNo, houseType = 'Residential') => {
   const typeSuffixMap = {
     'Residential': 'R',
@@ -9,20 +23,37 @@ export const buildPropertyId = (prefix, houseNo, houseType = 'Residential') => {
     'Plot': 'P',
     'Government': 'G'
   };
-  const suffix = typeSuffixMap[houseType] || 'R';
+  const categorySuffix = typeSuffixMap[houseType] || 'R';
   let cleanPrefix = String(prefix || '').replace(/\D/g, '');
   if (!cleanPrefix) cleanPrefix = '09037010010';
 
-  const houseStr = String(houseNo || '').replace(/\D/g, '') || '10001';
-  let padHouse = houseStr;
-  if (cleanPrefix.length + houseStr.length < 16) {
-    padHouse = houseStr.padStart(16 - cleanPrefix.length, '0');
-  } else if (cleanPrefix.length + houseStr.length > 16) {
-    if (cleanPrefix.length > 16 - houseStr.length) {
-      cleanPrefix = cleanPrefix.slice(0, Math.max(0, 16 - houseStr.length));
-    }
+  // Base prefix is typically 10 digits (State 2 + Dist 3 + ULB 5)
+  let basePrefix = cleanPrefix;
+  if (basePrefix.length === 11 && basePrefix.endsWith('0')) {
+    basePrefix = basePrefix.slice(0, 10);
+  } else if (basePrefix.length > 10) {
+    basePrefix = basePrefix.slice(0, 10);
   }
-  return `${cleanPrefix}${padHouse}${suffix}`;
+
+  const { num, sub } = parseHouseNo(houseNo);
+  const houseSpace = 16 - basePrefix.length; // 6 digits/chars for house part
+
+  let housePart = '';
+  if (sub) {
+    const numSpace = Math.max(1, houseSpace - sub.length);
+    const padNum = num.length < numSpace ? num.padStart(numSpace, '0') : num;
+    housePart = (padNum + sub).slice(-houseSpace);
+  } else {
+    housePart = num.length < houseSpace ? num.padStart(houseSpace, '0') : num;
+  }
+
+  if (basePrefix.length + housePart.length > 16) {
+    basePrefix = basePrefix.slice(0, Math.max(0, 16 - housePart.length));
+  } else if (basePrefix.length + housePart.length < 16) {
+    housePart = housePart.padStart(16 - basePrefix.length, '0');
+  }
+
+  return `${basePrefix}${housePart}${categorySuffix}`;
 };
 
 export default function FastEntryForm({ 
@@ -212,7 +243,7 @@ export default function FastEntryForm({
         next.house_tax_rate = getRateForNirman(value, settings);
       }
 
-      if (field === 'house_no' && !editingRecord) {
+      if (field === 'house_no') {
         const currentWard = (wards || []).find(w => w.ward_no === prev.ward_no);
         const currentPrefix = currentWard?.id_prefix || settings?.id_prefix;
         next.property_id = buildPropertyId(currentPrefix, value, prev.house_type);
@@ -976,6 +1007,20 @@ export default function FastEntryForm({
                   onChange={(e) => handleChange('property_id', e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const currentWard = (wards || []).find(w => w.ward_no === formData.ward_no);
+                    const currentPrefix = currentWard?.id_prefix || settings?.id_prefix;
+                    const synced = buildPropertyId(currentPrefix, formData.house_no, formData.house_type);
+                    handleChange('property_id', synced);
+                  }}
+                  title="हाउस नंबर के अनुसार आईडी री-जेनरेट करें"
+                  style={{ borderLeft: 'none' }}
+                >
+                  🔄 ऑटो आईडी
+                </button>
                 <button
                   type="button"
                   className="btn btn-outline"
