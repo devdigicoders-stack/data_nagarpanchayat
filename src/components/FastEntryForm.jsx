@@ -114,7 +114,12 @@ export default function FastEntryForm({
     has_water_tax: false,
     water_tax_percent: 7.5,
     has_sewer_tax: false,
-    sewer_tax_percent: 2.5
+    sewer_tax_percent: 2.5,
+    rebate_rainwater: false,
+    rebate_greenery: false,
+    rebate_parking: false,
+    rebate_pollution: false,
+    govt_service_type: 'tax_100'
   });
 
   function getRateForNirman(nirman, setts) {
@@ -163,7 +168,12 @@ export default function FastEntryForm({
         has_water_tax: Boolean(editingRecord.has_water_tax),
         water_tax_percent: Number(editingRecord.water_tax_percent ?? 7.5),
         has_sewer_tax: Boolean(editingRecord.has_sewer_tax),
-        sewer_tax_percent: Number(editingRecord.sewer_tax_percent ?? 2.5)
+        sewer_tax_percent: Number(editingRecord.sewer_tax_percent ?? 2.5),
+        rebate_rainwater: Boolean(editingRecord.rebate_rainwater),
+        rebate_greenery: Boolean(editingRecord.rebate_greenery),
+        rebate_parking: Boolean(editingRecord.rebate_parking),
+        rebate_pollution: Boolean(editingRecord.rebate_pollution),
+        govt_service_type: editingRecord.govt_service_type || 'tax_100'
       });
     } else {
       const savedWardNo = Number(localStorage.getItem('sticky_active_ward_no')) || settings?.active_ward_no || (wards && wards[0]?.ward_no) || 1;
@@ -658,22 +668,47 @@ export default function FastEntryForm({
 
   const taxablePlotArea = isNoDiscount ? plotArea : Math.round(plotArea * discountMultiplier);
 
+  // Rule 7(5) Non-Residential Incentives / Rebates (2% each, max 8%)
+  const rebateRainwater = Boolean(formData.rebate_rainwater);
+  const rebateGreenery = Boolean(formData.rebate_greenery);
+  const rebateParking = Boolean(formData.rebate_parking);
+  const rebatePollution = Boolean(formData.rebate_pollution);
+
+  let rebatePercent = 0;
+  if (isCommercial || isMixed) {
+    if (rebateRainwater) rebatePercent += 2;
+    if (rebateGreenery) rebatePercent += 2;
+    if (rebateParking) rebatePercent += 2;
+    if (rebatePollution) rebatePercent += 2;
+  }
+
   const resMonthly = taxableResArea * houseRate;
   const comMonthly = taxableBusinessArea * comRate;
   const plotMonthly = taxablePlotArea * plotRate;
-  const grossMonthly = isPlot ? plotMonthly : (resMonthly + comMonthly + plotMonthly);
-  const grossARV = Math.round(grossMonthly * 12);
 
   const resARV = isPlot ? 0 : Math.round(taxableResArea * houseRate * 12);
-  const comARV = isPlot ? 0 : Math.round(taxableBusinessArea * comRate * 12);
+  const rawComARV = isPlot ? 0 : Math.round(taxableBusinessArea * comRate * 12);
+  
+  // Apply Rule 7(5) 2% rebate to commercial ARV
+  const targetComARV = isCommercial ? (resARV + rawComARV) : rawComARV;
+  const rebateAmount = rebatePercent > 0 ? Math.round(targetComARV * (rebatePercent / 100)) : 0;
+  const comARV = Math.max(0, targetComARV - rebateAmount);
+
   const plotARV = Math.round(taxablePlotArea * plotRate * 12);
-  const netARV = isPlot ? plotARV : (resARV + comARV + plotARV);
+  const netARV = isPlot ? plotARV : ((isCommercial ? 0 : resARV) + comARV + plotARV);
   const discountAmt = isNoDiscount ? 0 : Math.max(0, ((coveredArea * houseRate + businessArea * comRate + plotArea * plotRate) * 12) - netARV);
+
+  // Rule 7(3) Central Government Service Charge Options
+  const govtServiceType = formData.govt_service_type || 'tax_100';
+  let govtServicePercent = 100;
+  if (govtServiceType === 'service_75') govtServicePercent = 75;
+  else if (govtServiceType === 'service_50') govtServicePercent = 50;
+  else if (govtServiceType === 'service_33') govtServicePercent = 33.33;
 
   // House Tax calculation based on property type:
   // Residential: 10% (1x)
   // Commercial: 20% (दोगुना - 2x)
-  // Government: 30% (तीन गुना - 3x)
+  // Government: 30% (तीन गुना - 3x) with Rule 7(3) service charge
   // Mixed: Residential 10% + Commercial 20%
   // Plot: 10% (प्लॉट टैक्स)
   let resTax = 0;
@@ -687,17 +722,17 @@ export default function FastEntryForm({
     comTax = 0;
     plotTax = Math.round(plotARV * (taxPct / 100));
   } else if (houseTypeLower === 'commercial') {
-    taxRateNotice = '20% (दोगुना - 2x)';
-    const commercialCoveredARV = resARV + comARV;
-    comTax = Math.round(commercialCoveredARV * ((taxPct * 2) / 100));
+    taxRateNotice = `20% (दोगुना - 2x)${rebatePercent > 0 ? ` [${rebatePercent}% प्रोत्साहन छूट]` : ''}`;
+    comTax = Math.round(comARV * ((taxPct * 2) / 100));
     resTax = 0;
   } else if (houseTypeLower === 'government') {
-    taxRateNotice = '30% (तीन गुना - 3x)';
-    const govtCoveredARV = resARV + comARV;
-    resTax = Math.round(govtCoveredARV * ((taxPct * 3) / 100));
+    taxRateNotice = govtServicePercent < 100 ? `सेवा प्रभार ${govtServicePercent}% (नियम 7(3))` : '30% (तीन गुना - 3x)';
+    const govtCoveredARV = resARV + rawComARV;
+    const baseGovtTax = Math.round(govtCoveredARV * ((taxPct * 3) / 100));
+    resTax = Math.round(baseGovtTax * (govtServicePercent / 100));
     comTax = 0;
   } else if (houseTypeLower === 'mixed') {
-    taxRateNotice = 'आवास 10% + दुकान 20%';
+    taxRateNotice = `आवास 10% + दुकान 20%${rebatePercent > 0 ? ` [दुकान ${rebatePercent}% छूट]` : ''}`;
     resTax = Math.round(resARV * (taxPct / 100));
     comTax = Math.round(comARV * ((taxPct * 2) / 100));
   } else {
@@ -803,6 +838,14 @@ export default function FastEntryForm({
       house_tax: houseTax,
       water_tax: waterTax,
       sewer_tax: sewerTax,
+      rebate_rainwater: rebateRainwater,
+      rebate_greenery: rebateGreenery,
+      rebate_parking: rebateParking,
+      rebate_pollution: rebatePollution,
+      rebate_percent: rebatePercent,
+      rebate_amount: rebateAmount,
+      govt_service_type: govtServiceType,
+      govt_service_percent: govtServicePercent,
       total_tax: finalTax
     };
 
@@ -1846,6 +1889,198 @@ export default function FastEntryForm({
 
             </div>
           </div>
+
+          {/* Rule 7(5) Non-Residential Incentives / Rebates (अनावासीय भवन प्रोत्साहन छूट - 2% प्रति उपाय) */}
+          {(isCommercial || isMixed) && (
+            <div style={{
+              background: '#f8fafc',
+              padding: '14px',
+              borderRadius: 'var(--radius-md)',
+              border: '1.5px solid #cbd5e1',
+              marginTop: '1.25rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>🌱</span>
+                    <span>नियम 7(5) अनावासीय भवन प्रोत्साहन छूट (2% प्रति उपाय - अधिकतम 8%)</span>
+                  </span>
+                  <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: 2 }}>
+                    उ.प्र. गजट 28 जून 2024: अनावासीय भवन/दुकान के वार्षिक मूल्य (ARV) में छूट का प्रावधान
+                  </div>
+                </div>
+                {rebatePercent > 0 && (
+                  <span className="badge-auto" style={{ background: '#dcfce7', color: '#166534', fontWeight: 700 }}>
+                    लागू छूट: {rebatePercent}% (-₹{rebateAmount})
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                {/* 1. Rainwater Harvesting */}
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 12px',
+                  background: formData.rebate_rainwater ? '#f0fdf4' : '#fff',
+                  border: formData.rebate_rainwater ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.rebate_rainwater)}
+                    onChange={(e) => handleChange('rebate_rainwater', e.target.checked)}
+                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#16a34a' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, color: formData.rebate_rainwater ? '#15803d' : '#334155' }}>
+                      💧 वर्षा जल संचयन प्रणाली (2%)
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Rainwater Harvesting चालू होने पर</div>
+                  </div>
+                </label>
+
+                {/* 2. Greenery 40% */}
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 12px',
+                  background: formData.rebate_greenery ? '#f0fdf4' : '#fff',
+                  border: formData.rebate_greenery ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.rebate_greenery)}
+                    onChange={(e) => handleChange('rebate_greenery', e.target.checked)}
+                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#16a34a' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, color: formData.rebate_greenery ? '#15803d' : '#334155' }}>
+                      🌳 ≥40% वृक्षारोपण / हरियाली (2%)
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b' }}>40% क्षेत्रफल में हरियाली/वृक्ष</div>
+                  </div>
+                </label>
+
+                {/* 3. Dedicated Parking */}
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 12px',
+                  background: formData.rebate_parking ? '#f0fdf4' : '#fff',
+                  border: formData.rebate_parking ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.rebate_parking)}
+                    onChange={(e) => handleChange('rebate_parking', e.target.checked)}
+                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#16a34a' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, color: formData.rebate_parking ? '#15803d' : '#334155' }}>
+                      🚗 पर्याप्त पार्किंग व्यवस्था (2%)
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b' }}>समुचित व पर्याप्त पार्किंग स्थान</div>
+                  </div>
+                </label>
+
+                {/* 4. Pollution Control */}
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 12px',
+                  background: formData.rebate_pollution ? '#f0fdf4' : '#fff',
+                  border: formData.rebate_pollution ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.rebate_pollution)}
+                    onChange={(e) => handleChange('rebate_pollution', e.target.checked)}
+                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#16a34a' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, color: formData.rebate_pollution ? '#15803d' : '#334155' }}>
+                      🏭 प्रदूषणरोधी उपाय (2%)
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b' }}>प्रभावकारी प्रदूषण नियंत्रण उपाय</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Rule 7(3) Central Government Service Charge (भारत संघ / विभाग सेवा प्रभार) */}
+          {formData.house_type === 'Government' && (
+            <div style={{
+              background: '#fef3c7',
+              padding: '14px',
+              borderRadius: 'var(--radius-md)',
+              border: '1.5px solid #f59e0b',
+              marginTop: '1.25rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>🏛️</span>
+                  <span>नियम 7(3) भारत संघ / सरकारी विभाग सेवा प्रभार (Service Charge)</span>
+                </span>
+                <span className="badge-auto" style={{ background: '#fef08a', color: '#854d0e', fontWeight: 700 }}>
+                  लागू दर: {govtServicePercent}%
+                </span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#78350f', marginBottom: 10 }}>
+                उ.प्र. गजट 28 जून 2024: पालिका द्वारा उपबंधित सेवाओं के आधार पर भारत संघ / विभागों द्वारा संदेय सेवा प्रभार चुनें:
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+                {[
+                  { id: 'service_75', label: 'पूर्ण सेवा (Full Services)', pct: '75% सेवा प्रभार' },
+                  { id: 'service_50', label: 'आंशिक सेवा (Partial Services)', pct: '50% सेवा प्रभार' },
+                  { id: 'service_33', label: 'शून्य/न्यूनतम सेवा (Basic Services)', pct: '33.33% सेवा प्रभार' },
+                  { id: 'tax_100', label: 'मानक सरकारी कर (Standard Tax)', pct: '100% कर' },
+                ].map(opt => (
+                  <label key={opt.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 12px',
+                    background: (formData.govt_service_type || 'tax_100') === opt.id ? '#fff' : '#fffbeb',
+                    border: (formData.govt_service_type || 'tax_100') === opt.id ? '2px solid #d97706' : '1px solid #fde68a',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem'
+                  }}>
+                    <input
+                      type="radio"
+                      name="govt_service_type"
+                      value={opt.id}
+                      checked={(formData.govt_service_type || 'tax_100') === opt.id}
+                      onChange={() => handleChange('govt_service_type', opt.id)}
+                      style={{ accentColor: '#d97706', cursor: 'pointer' }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#92400e' }}>{opt.pct}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#b45309' }}>{opt.label}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Rates and Discount Overrides */}
           <div style={{ marginTop: '1.25rem' }}>

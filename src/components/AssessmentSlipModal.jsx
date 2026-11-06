@@ -222,6 +222,24 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                   <td>20% (दोगुना)</td>
                   <td>₹{comTax.toLocaleString('en-IN')}</td>
                 </tr>
+                {Number(property.rebate_percent) > 0 && (
+                  <tr style={{ background: '#f0fdf4', color: '#166534', fontSize: '0.8rem' }}>
+                    <td colSpan="3">
+                      🌱 <strong>नियम 7(5) अनावासीय प्रोत्साहन छूट ({property.rebate_percent}%):</strong>{' '}
+                      {[
+                        property.rebate_rainwater && 'वर्षा जल संचयन (2%)',
+                        property.rebate_greenery && '40% हरियाली (2%)',
+                        property.rebate_parking && 'पार्किंग (2%)',
+                        property.rebate_pollution && 'प्रदूषण नियंत्रण (2%)'
+                      ].filter(Boolean).join(', ')}
+                    </td>
+                    <td>-₹{(property.rebate_amount || 0).toLocaleString('en-IN')} (ARV छूट)</td>
+                    <td>-{property.rebate_percent}%</td>
+                    <td style={{ color: '#15803d', fontWeight: 700 }}>
+                      लागू छूट
+                    </td>
+                  </tr>
+                )}
                 <tr>
                   <td>रिक्त भूखंड भाग (Plot Area)</td>
                   <td>{plotArea} वर्ग फुट</td>
@@ -243,7 +261,15 @@ export default function AssessmentSlipModal({ property, settings, onClose }) {
                           : '(कवर्ड एरिया के 80% भाग पर कर निर्धारण)'}
                   </td>
                   <td>₹{totalARV.toLocaleString('en-IN')}</td>
-                  <td>{property.house_type?.toLowerCase() === 'commercial' ? '20% (दोगुना)' : property.house_type?.toLowerCase() === 'government' ? '30% (तीन गुना)' : property.house_type?.toLowerCase() === 'mixed' ? 'मिश्रित दर' : '10%'}</td>
+                  <td>
+                    {property.house_type?.toLowerCase() === 'commercial' 
+                      ? (property.rebate_percent > 0 ? `20% [${property.rebate_percent}% छूट समायोजित]` : '20% (दोगुना)')
+                      : property.house_type?.toLowerCase() === 'government' 
+                        ? (property.govt_service_percent < 100 ? `सेवा प्रभार: ${property.govt_service_percent}%` : '30% (तीन गुना)') 
+                        : property.house_type?.toLowerCase() === 'mixed' 
+                          ? 'मिश्रित दर' 
+                          : '10%'}
+                  </td>
                   <td style={{ color: '#0369a1' }}>₹{houseTax.toLocaleString('en-IN')}</td>
                 </tr>
 
