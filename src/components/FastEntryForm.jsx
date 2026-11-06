@@ -685,6 +685,8 @@ export default function FastEntryForm({
   const resMonthly = taxableResArea * houseRate;
   const comMonthly = taxableBusinessArea * comRate;
   const plotMonthly = taxablePlotArea * plotRate;
+  const grossMonthly = isPlot ? plotMonthly : (resMonthly + comMonthly + plotMonthly);
+  const grossARV = Math.round(grossMonthly * 12);
 
   const resARV = isPlot ? 0 : Math.round(taxableResArea * houseRate * 12);
   const rawComARV = isPlot ? 0 : Math.round(taxableBusinessArea * comRate * 12);
